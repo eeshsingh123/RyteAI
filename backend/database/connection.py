@@ -47,7 +47,7 @@ class DatabaseManager:
             logger.error(f"Error creating indexes: {e}")
     
     def get_database(self) -> AsyncIOMotorDatabase:
-        if not self.database:
+        if self.database is None:
             raise RuntimeError("Database not initialized. Call connect_to_mongo() first.")
         return self.database
 

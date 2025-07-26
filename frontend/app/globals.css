@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -119,4 +121,185 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Canvas Editor Styles - Notion-like clean spacing */
+.canvas-editor-content {
+  @apply text-foreground leading-relaxed;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.canvas-editor-content .ProseMirror {
+  outline: none;
+}
+
+/* Paragraphs - minimal spacing */
+.canvas-editor-content p {
+  @apply my-1;
+  line-height: 1.6;
+}
+
+.canvas-editor-content p:first-child {
+  @apply mt-0;
+}
+
+.canvas-editor-content p:last-child {
+  @apply mb-0;
+}
+
+/* Placeholder styling */
+.canvas-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  @apply text-muted-foreground;
+  pointer-events: none;
+  height: 0;
+  white-space: pre-wrap;
+}
+
+/* Headings - clean hierarchy */
+.canvas-editor-content h1,
+.canvas-editor-content h2,
+.canvas-editor-content h3,
+.canvas-editor-content h4,
+.canvas-editor-content h5,
+.canvas-editor-content h6 {
+  @apply font-semibold;
+  margin: 1.5rem 0 0.5rem 0;
+  line-height: 1.3;
+}
+
+.canvas-editor-content h1:first-child,
+.canvas-editor-content h2:first-child,
+.canvas-editor-content h3:first-child,
+.canvas-editor-content h4:first-child,
+.canvas-editor-content h5:first-child,
+.canvas-editor-content h6:first-child {
+  @apply mt-0;
+}
+
+.canvas-editor-content h1 {
+  @apply text-3xl;
+}
+
+.canvas-editor-content h2 {
+  @apply text-2xl;
+}
+
+.canvas-editor-content h3 {
+  @apply text-xl;
+}
+
+.canvas-editor-content h4 {
+  @apply text-lg;
+}
+
+.canvas-editor-content h5 {
+  @apply text-base;
+}
+
+.canvas-editor-content h6 {
+  @apply text-sm;
+}
+
+/* Lists - proper bullet styling and spacing */
+.canvas-editor-content ul,
+.canvas-editor-content ol {
+  @apply my-2 pl-6;
+}
+
+.canvas-editor-content ul li,
+.canvas-editor-content ol li {
+  @apply my-0.5;
+  line-height: 1.6;
+}
+
+/* Bullet points styling */
+.canvas-editor-content ul li {
+  @apply list-disc;
+}
+
+.canvas-editor-content ul li::marker {
+  @apply text-muted-foreground;
+}
+
+/* Numbered lists styling */
+.canvas-editor-content ol li {
+  @apply list-decimal;
+}
+
+.canvas-editor-content ol li::marker {
+  @apply text-muted-foreground font-medium;
+}
+
+/* Nested lists */
+.canvas-editor-content ul ul,
+.canvas-editor-content ul ol,
+.canvas-editor-content ol ul,
+.canvas-editor-content ol ol {
+  @apply my-1;
+}
+
+.canvas-editor-content ul ul li,
+.canvas-editor-content ul ol li,
+.canvas-editor-content ol ul li,
+.canvas-editor-content ol ol li {
+  @apply my-0.5;
+}
+
+/* List item content spacing */
+.canvas-editor-content li p {
+  @apply my-0.5;
+}
+
+.canvas-editor-content li p:first-child {
+  @apply mt-0;
+}
+
+.canvas-editor-content li p:last-child {
+  @apply mb-0;
+}
+
+/* Blockquotes */
+.canvas-editor-content blockquote {
+  @apply border-l-4 border-border my-2 pl-4 italic text-muted-foreground;
+}
+
+/* Code blocks - proper styling */
+.canvas-editor-content pre {
+  @apply bg-muted rounded-md p-3 my-3 overflow-x-auto;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas,
+    "Liberation Mono", Menlo, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.canvas-editor-content pre code {
+  @apply bg-transparent p-0 text-sm;
+  font-family: inherit;
+  font-weight: 400;
+  border-radius: 0;
+}
+
+/* Inline code */
+.canvas-editor-content code {
+  @apply bg-muted rounded px-1.5 py-0.5 text-sm font-medium;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas,
+    "Liberation Mono", Menlo, monospace;
+  font-size: 0.875em;
+}
+
+/* Strong and emphasis */
+.canvas-editor-content strong {
+  @apply font-semibold;
+}
+
+.canvas-editor-content em {
+  @apply italic;
+}
+
+/* Horizontal rules */
+.canvas-editor-content hr {
+  @apply border-0 border-t border-border my-4;
 }

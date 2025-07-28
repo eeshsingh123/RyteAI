@@ -32,6 +32,16 @@ export const CanvasItem = ({
         onDelete(canvas.id);
     };
 
+    const handleToggleFavoriteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        handleToggleFavorite();
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        handleDelete();
+    };
+
     const handleClick = () => {
         router.push(`/canvas/${canvas.id}`);
     };
@@ -64,11 +74,11 @@ export const CanvasItem = ({
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleToggleFavorite}>
+                    <DropdownMenuItem onClick={handleToggleFavoriteClick}>
                         <Star className={`h-4 w-4 ${canvas.is_favorite ? 'fill-yellow-400 text-yellow-400' : ''}`} />
                         {canvas.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleDelete} variant="destructive">
+                    <DropdownMenuItem onClick={handleDeleteClick} variant="destructive">
                         <Trash2 className="h-4 w-4" />
                         Delete canvas
                     </DropdownMenuItem>

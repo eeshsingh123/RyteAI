@@ -51,7 +51,7 @@ export default function CanvasPage() {
     };
 
     return (
-        <SidebarProvider defaultOpen={false}>
+        <SidebarProvider defaultOpen={true}>
             <CanvasSidebar
                 canvases={canvases}
                 onCreateCanvas={handleCreateCanvas}

@@ -90,10 +90,10 @@ export const CanvasSidebar = ({
                     {favoriteCanvases.length > 0 && (
                         <div className="space-y-2">
                             <div className="flex items-center gap-2 px-2">
-                                <Heart className="h-4 w-4 text-red-500 shrink-0" />
+                                <Heart className="h-4 w-4 text-red-500 shrink-0 group-data-[collapsible=icon]:hidden" />
                                 <h3 className="font-medium text-sm group-data-[collapsible=icon]:hidden">Favorites</h3>
                             </div>
-                            <ScrollArea className="h-48">
+                            <ScrollArea className="h-48 group-data-[collapsible=icon]:hidden">
                                 <div className="space-y-2">
                                     {favoriteCanvases.map((canvas) => (
                                         <CanvasItem

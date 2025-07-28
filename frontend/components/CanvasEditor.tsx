@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Button } from "@/components/ui/button";
@@ -37,14 +37,13 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
     const [isSaving, setIsSaving] = useState(false);
     const [isAutoSaving, setIsAutoSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
     // Initialize editor with proper StarterKit configuration
     const editor = useEditor({
         extensions: [
             StarterKit,
             Placeholder.configure({
-                placeholder: 'Start writing your content here...\n\nYou can use markdown syntax like:\n# Heading\n## Subheading\n**Bold text**\n*Italic text*\n- List item\n> Quote\n`code`',
+                placeholder: 'Let your imagination run wild...',
             }),
         ],
         content: '',
@@ -58,40 +57,57 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         },
     });
 
-    // Debounced auto-save function
+    // Separate refs for different types of saves
+    const contentDebounceRef = useRef<NodeJS.Timeout | null>(null);
+    const titleDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Extract common save logic
+    const saveCanvas = useCallback(async (name: string, content: JSONContent) => {
+        if (!currentCanvas) return;
+
+        setIsAutoSaving(true);
+        try {
+            const updatedCanvas = await updateCanvas(canvasId, {
+                name,
+                content
+            });
+
+            if (updatedCanvas) {
+                onCanvasUpdate(updatedCanvas);
+                setLastSaved(new Date());
+            }
+        } catch (error) {
+            console.error('Error auto-saving canvas:', error);
+        } finally {
+            setIsAutoSaving(false);
+        }
+    }, [currentCanvas, canvasId, updateCanvas, onCanvasUpdate]);
+
+    // Debounced auto-save function for content
     const handleAutoSave = useCallback(() => {
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
+        if (contentDebounceRef.current) {
+            clearTimeout(contentDebounceRef.current);
         }
 
-        debounceRef.current = setTimeout(async () => {
-            if (!currentCanvas || !editor) return;
+        contentDebounceRef.current = setTimeout(() => {
+            if (!editor) return;
+            saveCanvas(canvasName, editor.getJSON());
+        }, 5000);
+    }, [canvasName, editor, saveCanvas]);
 
-            setIsAutoSaving(true);
-            try {
-                const content = editor.getJSON();
-                const updatedCanvas = await updateCanvas(canvasId, {
-                    name: canvasName,
-                    content: content
-                });
-
-                if (updatedCanvas) {
-                    onCanvasUpdate(updatedCanvas);
-                    setLastSaved(new Date());
-                }
-            } catch (error) {
-                console.error('Error auto-saving canvas:', error);
-            } finally {
-                setIsAutoSaving(false);
-            }
-        }, 2000); // Auto-save after 2 seconds of inactivity
-    }, [currentCanvas, editor, canvasId, canvasName, updateCanvas, onCanvasUpdate]);
-
-    // Handle title change with auto-save
+    // Handle title change with separate debouncing
     const handleTitleChange = useCallback((value: string) => {
         setCanvasName(value);
-        handleAutoSave();
-    }, [handleAutoSave]);
+
+        if (titleDebounceRef.current) {
+            clearTimeout(titleDebounceRef.current);
+        }
+
+        titleDebounceRef.current = setTimeout(() => {
+            if (!editor) return;
+            saveCanvas(value, editor.getJSON());
+        }, 2000);
+    }, [editor, saveCanvas]);
 
     // Update editor content when canvas changes
     useEffect(() => {
@@ -145,11 +161,14 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [handleSaveCanvas]);
 
-    // Cleanup debounce on unmount
+    // Cleanup both debounces on unmount
     useEffect(() => {
         return () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
+            if (contentDebounceRef.current) {
+                clearTimeout(contentDebounceRef.current);
+            }
+            if (titleDebounceRef.current) {
+                clearTimeout(titleDebounceRef.current);
             }
         };
     }, []);

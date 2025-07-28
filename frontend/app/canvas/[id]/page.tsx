@@ -26,21 +26,34 @@ export default function CanvasEditorPage() {
 
     const [currentCanvas, setCurrentCanvas] = useState<Canvas | null>(null);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
+    const [isInitialized, setIsInitialized] = useState(false);
 
-    // Load canvas data and canvases list
+    // Load canvases list once on mount (for sidebar)
     useEffect(() => {
-        const loadData = async () => {
-            setIsInitialLoading(true);
-            try {
-                // Load all canvases for sidebar
-                await getCanvases();
+        getCanvases();
+    }, [getCanvases]);
 
-                // Load specific canvas
-                const canvas = await getCanvas(canvasId);
+    // Load specific canvas ONLY on initial mount or when canvasId actually changes
+    useEffect(() => {
+        const loadCanvas = async () => {
+            // Don't reload if we're already initialized and have the right canvas
+            if (isInitialized && currentCanvas?.id === canvasId) {
+                return;
+            }
+
+            try {
+                // First check if we have this canvas in our local list
+                let canvas: Canvas | null = canvases.find(c => c.id === canvasId) || null;
+
+                if (!canvas) {
+                    // If not in local list, fetch from API
+                    canvas = await getCanvas(canvasId);
+                }
+
                 if (canvas) {
                     setCurrentCanvas(canvas);
+                    setIsInitialized(true);
                 } else {
-                    // Canvas not found, redirect to canvas list
                     router.push('/canvas');
                 }
             } catch (error) {
@@ -52,9 +65,16 @@ export default function CanvasEditorPage() {
         };
 
         if (canvasId) {
-            loadData();
+            loadCanvas();
         }
-    }, [canvasId, getCanvases, getCanvas, router]);
+    }, [canvasId, canvases, getCanvas, router]); // Include necessary dependencies
+
+    // Reset initialization when navigating to different canvas
+    useEffect(() => {
+        if (currentCanvas && currentCanvas.id !== canvasId) {
+            setIsInitialized(false);
+        }
+    }, [canvasId, currentCanvas]);
 
     // Create new canvas
     const handleCreateCanvas = useCallback(async () => {
@@ -70,13 +90,16 @@ export default function CanvasEditorPage() {
     }, [createCanvas, router]);
 
     // Handle delete canvas
-    const handleDeleteCanvas = useCallback(async (canvasId: string) => {
+    const handleDeleteCanvas = useCallback(async (canvasIdToDelete: string) => {
         try {
-            const success = await deleteCanvas(canvasId);
+            const success = await deleteCanvas(canvasIdToDelete);
             if (success) {
-                // If we're deleting the current canvas, redirect to canvas list
-                if (canvasId === currentCanvas?.id) {
+                // Only redirect if we're deleting the current canvas
+                if (currentCanvas?.id === canvasIdToDelete) {
                     router.push('/canvas');
+                } else {
+                    // If deleting a different canvas, just stay on the current page
+                    // The sidebar will automatically update since canvases state is managed by useCanvasApi
                 }
             }
         } catch (error) {

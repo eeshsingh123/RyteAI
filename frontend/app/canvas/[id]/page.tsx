@@ -67,7 +67,7 @@ export default function CanvasEditorPage() {
         if (canvasId) {
             loadCanvas();
         }
-    }, [canvasId, canvases, getCanvas, router]); // Include necessary dependencies
+    }, [canvasId, canvases, getCanvas, router, currentCanvas?.id, isInitialized]); // Include necessary dependencies
 
     // Reset initialization when navigating to different canvas
     useEffect(() => {

@@ -303,3 +303,57 @@
 .canvas-editor-content hr {
   @apply border-0 border-t border-border my-4;
 }
+
+/* Agent instruction hover tooltip */
+.agent-instruction-highlight::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgb(15, 23, 42);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  z-index: 1000;
+  pointer-events: none;
+  margin-bottom: 8px;
+}
+
+.agent-instruction-highlight::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgb(15, 23, 42);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  z-index: 1000;
+  pointer-events: none;
+  margin-bottom: 3px;
+}
+
+.agent-instruction-highlight:hover::after,
+.agent-instruction-highlight:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Dark mode tooltip styling */
+.dark .agent-instruction-highlight::after {
+  background: rgb(241, 245, 249);
+  color: rgb(15, 23, 42);
+}
+
+.dark .agent-instruction-highlight::before {
+  border-top-color: rgb(241, 245, 249);
+}

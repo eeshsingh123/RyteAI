@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useEditor, EditorContent, JSONContent } from "@tiptap/react";
+import { useEditor, EditorContent, JSONContent, Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { toast } from "sonner";
+import { AIResponse } from "./AgentMarks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,7 +24,8 @@ import {
     Hash,
     Quote,
     Code,
-    CheckCircle
+    CheckCircle,
+    Bot
 } from "lucide-react";
 import { Canvas } from "@/types/canvas";
 import { useCanvasApi } from "@/hooks/useCanvasApi";
@@ -32,11 +38,181 @@ interface CanvasEditorProps {
 
 export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: CanvasEditorProps) => {
     const router = useRouter();
-    const { updateCanvas } = useCanvasApi();
+    const { updateCanvas, executeInstruction } = useCanvasApi();
     const [canvasName, setCanvasName] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [isAutoSaving, setIsAutoSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [isProcessingInstruction, setIsProcessingInstruction] = useState(false);
+
+    // Handle @agent instruction execution
+    const handleAgentInstruction = useCallback(async (editor: Editor, instruction: string, lineStart: number, lineEnd: number) => {
+        if (!currentCanvas || isProcessingInstruction) return;
+
+        setIsProcessingInstruction(true);
+
+        try {
+            // Show processing toast
+            toast.loading('Processing your instruction...', {
+                id: 'agent-processing'
+            });
+
+            // Execute the instruction
+            const response = await executeInstruction(canvasId, instruction);
+
+            if (response) {
+                // Replace the @agent instruction with the response
+                // Replace the @agent instruction with the response
+                editor.chain()
+                    .setTextSelection({ from: lineStart, to: lineEnd })
+                    .insertContent(response)
+                    .run();
+
+                // Add green highlighting to the inserted response without selecting it
+                const responseLength = response.length;
+                setTimeout(() => {
+                    if (editor && !editor.isDestroyed) {
+                        // Apply green highlight mark
+                        editor.chain()
+                            .setTextSelection({ from: lineStart, to: lineStart + responseLength })
+                            .setMark('aiResponse')
+                            .run();
+
+                        // Clear selection immediately to show the green highlighting
+                        setTimeout(() => {
+                            if (editor && !editor.isDestroyed) {
+                                const currentPos = editor.state.selection.to;
+                                editor.chain().setTextSelection(currentPos).run();
+                            }
+                        }, 50);
+
+                        // Remove green highlighting after 7 seconds
+                        setTimeout(() => {
+                            if (editor && !editor.isDestroyed) {
+                                editor.chain()
+                                    .setTextSelection({ from: lineStart, to: lineStart + responseLength })
+                                    .unsetMark('aiResponse')
+                                    .run();
+                                // Clear selection again
+                                setTimeout(() => {
+                                    if (editor && !editor.isDestroyed) {
+                                        const currentPos = editor.state.selection.to;
+                                        editor.chain().setTextSelection(currentPos).run();
+                                    }
+                                }, 50);
+                            }
+                        }, 7000);
+                    }
+                }, 100);
+
+                // Show success toast
+                toast.success('Instruction processed successfully!', {
+                    id: 'agent-processing'
+                });
+            } else {
+                toast.error('Failed to process instruction', {
+                    id: 'agent-processing'
+                });
+            }
+        } catch (error) {
+            console.error('Error processing agent instruction:', error);
+            toast.error('Failed to process instruction', {
+                id: 'agent-processing'
+            });
+        } finally {
+            setIsProcessingInstruction(false);
+        }
+    }, [currentCanvas, canvasId, executeInstruction, isProcessingInstruction]);
+
+    // Create plugin for @agent highlighting using decorations (no infinite loops)
+    const agentHighlightPlugin = new Plugin({
+        key: new PluginKey('agentHighlight'),
+
+        state: {
+            init() {
+                return DecorationSet.empty;
+            },
+
+            apply(tr) {
+                const decorations: Decoration[] = [];
+
+                // Find @agent patterns and create decorations
+                tr.doc.descendants((node, pos) => {
+                    if (node.isText && node.text) {
+                        const text = node.text;
+                        const agentPattern = /@agent\s+[^\n\r]+/g;
+                        let match;
+
+                        while ((match = agentPattern.exec(text)) !== null) {
+                            const from = pos + match.index;
+                            const to = pos + match.index + match[0].length;
+
+                            const decoration = Decoration.inline(from, to, {
+                                class: 'agent-instruction-highlight',
+                                'data-tooltip': 'Press Enter to send this instruction to AI',
+                                style: 'background-color: rgba(59, 130, 246, 0.15); color: rgb(59, 130, 246); padding: 2px 4px; border-radius: 4px; font-weight: 500; cursor: pointer; position: relative;'
+                            });
+
+                            decorations.push(decoration);
+                        }
+                    }
+                });
+
+                return DecorationSet.create(tr.doc, decorations);
+            }
+        },
+
+        props: {
+            decorations(state) {
+                return this.getState(state);
+            }
+        }
+    });
+
+    // Create custom extension for @agent handling
+    const AgentExtension = Extension.create({
+        name: 'agentHandler',
+
+        addProseMirrorPlugins() {
+            return [agentHighlightPlugin];
+        },
+
+        addKeyboardShortcuts() {
+            return {
+                'Enter': () => {
+                    if (isProcessingInstruction) return false;
+
+                    const { editor } = this;
+                    const { $from } = editor.state.selection;
+
+                    // Get current line text
+                    const lineStart = $from.start($from.depth);
+                    const lineEnd = $from.end($from.depth);
+                    const lineText = editor.state.doc.textBetween(lineStart, lineEnd);
+
+                    console.log('Checking line:', lineText); // Debug log
+
+                    // Check for @agent pattern
+                    const agentPattern = /^@agent\s+(.+)$/;
+                    const match = lineText.match(agentPattern);
+
+                    if (match && match[1].trim()) {
+                        const instruction = match[1].trim();
+                        console.log('Found @agent instruction:', instruction); // Debug log
+
+                        // Prevent default Enter behavior
+                        setTimeout(() => {
+                            handleAgentInstruction(editor, instruction, lineStart, lineEnd);
+                        }, 10);
+
+                        return true; // Prevent default Enter
+                    }
+
+                    return false; // Allow default Enter behavior
+                }
+            }
+        }
+    });
 
     // Initialize editor with proper StarterKit configuration
     const editor = useEditor({
@@ -45,6 +221,8 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
             Placeholder.configure({
                 placeholder: 'Let your imagination run wild...',
             }),
+            AIResponse,
+            AgentExtension,
         ],
         content: '',
         editorProps: {
@@ -148,7 +326,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         }
     }, [currentCanvas, editor, canvasId, canvasName, updateCanvas, onCanvasUpdate]);
 
-    // Handle keyboard shortcuts
+    // Handle manual save keyboard shortcut (Ctrl+S)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.ctrlKey && e.key === 's') {
@@ -298,8 +476,14 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                     >
                         <Code className="h-4 w-4" />
                     </Button>
-                    <div className="text-xs text-muted-foreground ml-auto">
-                        Auto-save enabled • Ctrl+S to save manually
+                    <div className="text-xs text-muted-foreground ml-auto flex items-center gap-4">
+                        {isProcessingInstruction && (
+                            <div className="flex items-center gap-1">
+                                <Bot className="h-3 w-3 animate-pulse text-blue-500" />
+                                <span>Processing AI instruction...</span>
+                            </div>
+                        )}
+                        <span>Auto-save enabled • Ctrl+S to save manually</span>
                     </div>
                 </div>
             )}

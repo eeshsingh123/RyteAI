@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from config import settings
 from database.connection import db_manager
 from routers.canvas_router import router as canvas_router
+from routers.ai_router import router as ai_router
 
 # Configure logging
 logging.basicConfig(
@@ -99,6 +100,7 @@ async def root() -> dict:
 
 # Include routers
 app.include_router(canvas_router, prefix="/api/v1")
+app.include_router(ai_router, prefix="/api/v1")
 
 
 # Global exception handler

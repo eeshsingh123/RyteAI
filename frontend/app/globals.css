@@ -357,3 +357,21 @@
 .dark .agent-instruction-highlight::before {
   border-top-color: rgb(241, 245, 249);
 }
+
+/* Bubble Menu Styling */
+.bubble-menu {
+  z-index: 50;
+}
+
+.bubble-menu .bg-popover {
+  backdrop-filter: blur(8px);
+}
+
+/* Ensure bubble menu doesn't get clipped */
+.tippy-box {
+  max-width: none !important;
+}
+
+.tippy-content {
+  padding: 0 !important;
+}

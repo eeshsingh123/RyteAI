@@ -12,14 +12,13 @@ from routers.ai_router import router as ai_router
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     # Startup
     try:
         await db_manager.connect_to_mongo()
@@ -27,9 +26,9 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
         raise
-    
+
     yield
-    
+
     # Shutdown
     try:
         await db_manager.close_mongo_connection()
@@ -44,7 +43,7 @@ app = FastAPI(
     version=settings.app_version,
     description="RyteAI Backend API",
     docs_url="/docs",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Configure CORS middleware
@@ -64,15 +63,15 @@ async def healthcheck() -> JSONResponse:
         # Test database connection
         db = db_manager.get_database()
         await db.command("ping")
-        
+
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={
                 "status": "healthy",
                 "message": "Service is running properly",
                 "version": settings.app_version,
-                "database": "connected"
-            }
+                "database": "connected",
+            },
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -82,8 +81,8 @@ async def healthcheck() -> JSONResponse:
                 "status": "unhealthy",
                 "message": "Service is experiencing issues",
                 "error": str(e),
-                "database": "disconnected"
-            }
+                "database": "disconnected",
+            },
         )
 
 
@@ -94,7 +93,7 @@ async def root() -> dict:
         "message": f"Welcome to {settings.app_name}",
         "version": settings.app_version,
         "docs": "/docs",
-        "health": "/healthcheck"
+        "health": "/healthcheck",
     }
 
 
@@ -111,18 +110,18 @@ async def internal_server_error_handler(request, exc) -> JSONResponse:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": "Internal server error",
-            "message": "An unexpected error occurred. Please try again later."
-        }
+            "message": "An unexpected error occurred. Please try again later.",
+        },
     )
 
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
-        log_level="info"
+        log_level="info",
     )

@@ -8,6 +8,8 @@ import {
     USER_ID
 } from '@/types/canvas';
 
+export type ImproveAction = 'improve' | 'rephrase' | 'summarize' | 'expand' | 'simplify' | 'formal' | 'casual';
+
 export const useCanvasApi = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [canvases, setCanvases] = useState<Canvas[]>([]);
@@ -253,6 +255,48 @@ export const useCanvasApi = () => {
         }
     }, [handleApiError]);
 
+    const improveText = useCallback(async (
+        canvasId: string, 
+        selectedText: string, 
+        action: ImproveAction
+    ): Promise<string | null> => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/ai/improve-text`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    canvas_id: canvasId,
+                    user_id: USER_ID,
+                    selected_text: selectedText,
+                    action: action
+                })
+            });
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('Canvas not found');
+                }
+                if (response.status === 403) {
+                    throw new Error('Access denied to this canvas');
+                }
+                throw new Error(`Failed to improve text: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to improve text');
+            }
+
+            return data.improved_text;
+        } catch (error) {
+            handleApiError(error, 'Failed to improve text');
+            return null;
+        }
+    }, [handleApiError]);
+
     return {
         isLoading,
         canvases,
@@ -264,6 +308,7 @@ export const useCanvasApi = () => {
         toggleFavorite,
         renameCanvas,
         deleteCanvas,
-        executeInstruction
+        executeInstruction,
+        improveText
     };
-}; 
+};

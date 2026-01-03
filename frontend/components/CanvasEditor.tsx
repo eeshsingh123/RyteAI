@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useEditor, EditorContent, JSONContent, Editor } from "@tiptap/react";
+import { useEditor, EditorContent, JSONContent, Editor, BubbleMenu } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Extension } from "@tiptap/core";
@@ -25,10 +25,21 @@ import {
     Quote,
     Code,
     CheckCircle,
-    Bot
+    Bot,
+    Sparkles,
+    RefreshCw,
+    AlignLeft,
+    Expand,
+    Minimize2,
+    Briefcase,
+    MessageCircle,
+    Loader2
 } from "lucide-react";
 import { Canvas } from "@/types/canvas";
-import { useCanvasApi } from "@/hooks/useCanvasApi";
+import { useCanvasApi, ImproveAction } from "@/hooks/useCanvasApi";
+
+// Rate limiting constants
+const MIN_LLM_CALL_INTERVAL = 2000; // Minimum 2 seconds between LLM calls
 
 interface CanvasEditorProps {
     canvasId: string;
@@ -38,47 +49,132 @@ interface CanvasEditorProps {
 
 export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: CanvasEditorProps) => {
     const router = useRouter();
-    const { updateCanvas, executeInstruction } = useCanvasApi();
+    const { updateCanvas, executeInstruction, improveText } = useCanvasApi();
     const [canvasName, setCanvasName] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [isAutoSaving, setIsAutoSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [isProcessingInstruction, setIsProcessingInstruction] = useState(false);
+    const [isImproving, setIsImproving] = useState(false);
 
-    // Handle @agent instruction execution
+    // Rate limiting for LLM calls
+    const lastLLMCallRef = useRef<number>(0);
+
+    // Handle text improvement from bubble menu with rate limiting
+    const handleImproveText = useCallback(async (editor: Editor, action: ImproveAction) => {
+        if (!currentCanvas || isImproving) return;
+
+        // Rate limiting check
+        const now = Date.now();
+        const timeSinceLastCall = now - lastLLMCallRef.current;
+        if (timeSinceLastCall < MIN_LLM_CALL_INTERVAL) {
+            toast.error(`Please wait ${Math.ceil((MIN_LLM_CALL_INTERVAL - timeSinceLastCall) / 1000)} second(s) before making another request`);
+            return;
+        }
+
+        const { from, to } = editor.state.selection;
+        const selectedText = editor.state.doc.textBetween(from, to);
+
+        if (!selectedText.trim()) {
+            toast.error('Please select some text first');
+            return;
+        }
+
+        lastLLMCallRef.current = now;
+        setIsImproving(true);
+        toast.loading('Improving text...', { id: 'improve-text' });
+
+        try {
+            const improvedText = await improveText(canvasId, selectedText, action);
+
+            if (improvedText) {
+                // Replace selected text with improved version
+                editor.chain()
+                    .setTextSelection({ from, to })
+                    .insertContent(improvedText)
+                    .run();
+
+                // Highlight the improved text
+                const newTo = from + improvedText.length;
+                setTimeout(() => {
+                    if (editor && !editor.isDestroyed) {
+                        editor.chain()
+                            .setTextSelection({ from, to: newTo })
+                            .setMark('aiResponse')
+                            .run();
+
+                        // Clear selection
+                        setTimeout(() => {
+                            if (editor && !editor.isDestroyed) {
+                                editor.chain().setTextSelection(newTo).run();
+                            }
+                        }, 50);
+
+                        // Remove highlight after 7 seconds
+                        setTimeout(() => {
+                            if (editor && !editor.isDestroyed) {
+                                editor.chain()
+                                    .setTextSelection({ from, to: newTo })
+                                    .unsetMark('aiResponse')
+                                    .run();
+                                setTimeout(() => {
+                                    if (editor && !editor.isDestroyed) {
+                                        editor.chain().setTextSelection(newTo).run();
+                                    }
+                                }, 50);
+                            }
+                        }, 7000);
+                    }
+                }, 100);
+
+                toast.success('Text improved!', { id: 'improve-text' });
+            } else {
+                toast.error('Failed to improve text', { id: 'improve-text' });
+            }
+        } catch (error) {
+            console.error('Error improving text:', error);
+            toast.error('Failed to improve text', { id: 'improve-text' });
+        } finally {
+            setIsImproving(false);
+        }
+    }, [currentCanvas, canvasId, improveText, isImproving]);
+
+    // Handle @agent instruction execution with rate limiting
     const handleAgentInstruction = useCallback(async (editor: Editor, instruction: string, lineStart: number, lineEnd: number) => {
         if (!currentCanvas || isProcessingInstruction) return;
 
+        // Rate limiting check
+        const now = Date.now();
+        const timeSinceLastCall = now - lastLLMCallRef.current;
+        if (timeSinceLastCall < MIN_LLM_CALL_INTERVAL) {
+            toast.error(`Please wait ${Math.ceil((MIN_LLM_CALL_INTERVAL - timeSinceLastCall) / 1000)} second(s) before making another request`);
+            return;
+        }
+
+        lastLLMCallRef.current = now;
         setIsProcessingInstruction(true);
 
         try {
-            // Show processing toast
             toast.loading('Processing your instruction...', {
                 id: 'agent-processing'
             });
 
-            // Execute the instruction
             const response = await executeInstruction(canvasId, instruction);
 
             if (response) {
-                // Replace the @agent instruction with the response
-                // Replace the @agent instruction with the response
                 editor.chain()
                     .setTextSelection({ from: lineStart, to: lineEnd })
                     .insertContent(response)
                     .run();
 
-                // Add green highlighting to the inserted response without selecting it
                 const responseLength = response.length;
                 setTimeout(() => {
                     if (editor && !editor.isDestroyed) {
-                        // Apply green highlight mark
                         editor.chain()
                             .setTextSelection({ from: lineStart, to: lineStart + responseLength })
                             .setMark('aiResponse')
                             .run();
 
-                        // Clear selection immediately to show the green highlighting
                         setTimeout(() => {
                             if (editor && !editor.isDestroyed) {
                                 const currentPos = editor.state.selection.to;
@@ -86,14 +182,12 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                             }
                         }, 50);
 
-                        // Remove green highlighting after 7 seconds
                         setTimeout(() => {
                             if (editor && !editor.isDestroyed) {
                                 editor.chain()
                                     .setTextSelection({ from: lineStart, to: lineStart + responseLength })
                                     .unsetMark('aiResponse')
                                     .run();
-                                // Clear selection again
                                 setTimeout(() => {
                                     if (editor && !editor.isDestroyed) {
                                         const currentPos = editor.state.selection.to;
@@ -105,7 +199,6 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                     }
                 }, 100);
 
-                // Show success toast
                 toast.success('Instruction processed successfully!', {
                     id: 'agent-processing'
                 });
@@ -124,7 +217,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         }
     }, [currentCanvas, canvasId, executeInstruction, isProcessingInstruction]);
 
-    // Create plugin for @agent highlighting using decorations (no infinite loops)
+    // Create plugin for @agent highlighting using decorations
     const agentHighlightPlugin = new Plugin({
         key: new PluginKey('agentHighlight'),
 
@@ -136,7 +229,6 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
             apply(tr) {
                 const decorations: Decoration[] = [];
 
-                // Find @agent patterns and create decorations
                 tr.doc.descendants((node, pos) => {
                     if (node.isText && node.text) {
                         const text = node.text;
@@ -185,41 +277,35 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                     const { editor } = this;
                     const { $from } = editor.state.selection;
 
-                    // Get current line text
                     const lineStart = $from.start($from.depth);
                     const lineEnd = $from.end($from.depth);
                     const lineText = editor.state.doc.textBetween(lineStart, lineEnd);
 
-                    console.log('Checking line:', lineText); // Debug log
-
-                    // Check for @agent pattern
                     const agentPattern = /^@agent\s+(.+)$/;
                     const match = lineText.match(agentPattern);
 
                     if (match && match[1].trim()) {
                         const instruction = match[1].trim();
-                        console.log('Found @agent instruction:', instruction); // Debug log
 
-                        // Prevent default Enter behavior
                         setTimeout(() => {
                             handleAgentInstruction(editor, instruction, lineStart, lineEnd);
                         }, 10);
 
-                        return true; // Prevent default Enter
+                        return true;
                     }
 
-                    return false; // Allow default Enter behavior
+                    return false;
                 }
             }
         }
     });
 
-    // Initialize editor with proper StarterKit configuration
+    // Initialize editor
     const editor = useEditor({
         extensions: [
             StarterKit,
             Placeholder.configure({
-                placeholder: 'Let your imagination run wild...',
+                placeholder: 'Start typing... (use @agent for AI commands)',
             }),
             AIResponse,
             AgentExtension,
@@ -293,7 +379,6 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
             setCanvasName(currentCanvas.name);
             const content = currentCanvas.content || { type: 'doc', content: [{ type: 'paragraph' }] };
 
-            // Only update content if it's different from current content
             const currentContent = editor.getJSON();
             if (JSON.stringify(currentContent) !== JSON.stringify(content)) {
                 editor.commands.setContent(content);
@@ -339,7 +424,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [handleSaveCanvas]);
 
-    // Cleanup both debounces on unmount
+    // Cleanup debounces on unmount
     useEffect(() => {
         return () => {
             if (contentDebounceRef.current) {
@@ -483,12 +568,111 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                                 <span>Processing AI instruction...</span>
                             </div>
                         )}
-                        <span>Auto-save enabled • Ctrl+S to save manually</span>
+                        <span>Type @agent followed by your instruction</span>
                     </div>
                 </div>
             )}
 
-            <main className="flex-1 overflow-auto">
+            {/* AI Bubble Menu for text selection */}
+            {editor && (
+                <BubbleMenu
+                    editor={editor}
+                    tippyOptions={{
+                        duration: 100,
+                        placement: 'top',
+                        maxWidth: 'none',
+                        appendTo: () => document.body,
+                    }}
+                    className="bubble-menu"
+                >
+                    <div className="flex flex-wrap items-center gap-0.5 bg-popover border border-border rounded-lg shadow-lg p-1.5 max-w-[95vw]">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleImproveText(editor, 'improve')}
+                            disabled={isImproving}
+                            className="h-7 px-2 text-xs gap-1 shrink-0"
+                            title="Improve writing"
+                        >
+                            {isImproving ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <Sparkles className="h-3.5 w-3.5" />
+                            )}
+                            <span>Improve</span>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleImproveText(editor, 'rephrase')}
+                            disabled={isImproving}
+                            className="h-7 px-2 text-xs gap-1 shrink-0"
+                            title="Rephrase text"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            <span>Rephrase</span>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleImproveText(editor, 'summarize')}
+                            disabled={isImproving}
+                            className="h-7 px-2 text-xs gap-1 shrink-0"
+                            title="Summarize text"
+                        >
+                            <AlignLeft className="h-3.5 w-3.5" />
+                            <span>Summarize</span>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleImproveText(editor, 'expand')}
+                            disabled={isImproving}
+                            className="h-7 px-2 text-xs gap-1 shrink-0"
+                            title="Expand text"
+                        >
+                            <Expand className="h-3.5 w-3.5" />
+                            <span>Expand</span>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleImproveText(editor, 'simplify')}
+                            disabled={isImproving}
+                            className="h-7 px-2 text-xs gap-1 shrink-0"
+                            title="Simplify text"
+                        >
+                            <Minimize2 className="h-3.5 w-3.5" />
+                            <span>Simplify</span>
+                        </Button>
+                        <div className="w-px h-5 bg-border mx-0.5 shrink-0" />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleImproveText(editor, 'formal')}
+                            disabled={isImproving}
+                            className="h-7 px-2 text-xs gap-1 shrink-0"
+                            title="Make formal"
+                        >
+                            <Briefcase className="h-3.5 w-3.5" />
+                            <span>Formal</span>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleImproveText(editor, 'casual')}
+                            disabled={isImproving}
+                            className="h-7 px-2 text-xs gap-1 shrink-0"
+                            title="Make casual"
+                        >
+                            <MessageCircle className="h-3.5 w-3.5" />
+                            <span>Casual</span>
+                        </Button>
+                    </div>
+                </BubbleMenu>
+            )}
+
+            <main className="flex-1 overflow-auto relative">
                 <div className="w-full h-full">
                     <EditorContent
                         editor={editor}
@@ -497,4 +681,4 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
             </main>
         </SidebarInset>
     );
-}; 
+};

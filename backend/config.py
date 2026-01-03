@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -19,6 +20,9 @@ class Settings(BaseSettings):
     
     # CORS settings
     allowed_origins: list[str] = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000, http://127.0.0.1:3000").split(",")
+    
+    # AI/LLM settings
+    gemini_api_key: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     
     class Config:
         env_file = ".env"

@@ -115,11 +115,19 @@ class LLMService:
 
         context_text = "\n".join(context_parts) + "\n" if context_parts else ""
 
-        return f"""You are an AI writing assistant helping with a document.
+        return f"""You are an AI writing assistant helping with a document. Your response will be inserted directly into a rich text editor that supports markdown formatting.
 
 {context_text}User's instruction: {instruction}
 
-Respond directly with the content requested. Do not include any preamble, explanations, or meta-commentary. Just provide the actual content the user asked for."""
+IMPORTANT FORMATTING RULES:
+- Use proper markdown formatting (headers with #, bold with **, italic with *, lists with - or 1., etc.)
+- DO NOT wrap your entire response in markdown code blocks (```). Only use code blocks for actual code snippets.
+- Start your response directly with the content - no "Here's..." or "Sure..." preambles.
+- Use appropriate heading levels (# for main headings, ## for subheadings, etc.)
+- Format lists properly with proper indentation
+- Keep paragraphs well-structured with blank lines between them
+
+Respond directly with the content requested."""
 
     def _build_improve_prompt(
         self, selected_text: str, action: str, canvas_context: dict
@@ -147,7 +155,12 @@ Respond directly with the content requested. Do not include any preamble, explan
 Text to process:
 "{selected_text}"
 
-Respond with ONLY the improved text. Do not include any explanations, quotes, or additional commentary."""
+IMPORTANT: 
+- Respond with ONLY the improved text, no explanations or commentary.
+- Preserve any existing markdown formatting in the text.
+- If adding formatting, use proper markdown (**, *, -, #, etc.).
+- DO NOT wrap the response in markdown code blocks (```).
+- Do not add quotation marks around your response."""
 
 
 # Global instance

@@ -3,13 +3,37 @@ import { useRouter } from "next/navigation";
 import { useEditor, EditorContent, JSONContent, Editor, BubbleMenu } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
+import Highlight from "@tiptap/extension-highlight";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import Typography from "@tiptap/extension-typography";
+import HorizontalRule from "@tiptap/extension-horizontal-rule";
+import { common, createLowlight } from "lowlight";
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { toast } from "sonner";
 import { AIResponse } from "./AgentMarks";
+import { SlashCommands } from "./SlashCommands";
+import { markdownToHtml, containsMarkdown, cleanMarkdown } from "@/lib/markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
     SidebarInset,
 } from "@/components/ui/sidebar";
@@ -18,12 +42,17 @@ import {
     ArrowLeft,
     Bold,
     Italic,
+    Underline as UnderlineIcon,
+    Strikethrough,
     List,
     ListOrdered,
     FileText,
-    Hash,
+    Heading1,
+    Heading2,
+    Heading3,
     Quote,
     Code,
+    Code2,
     CheckCircle,
     Bot,
     Sparkles,
@@ -33,19 +62,72 @@ import {
     Minimize2,
     Briefcase,
     MessageCircle,
-    Loader2
+    Loader2,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Link as LinkIcon,
+    Highlighter,
+    Minus,
+    CheckSquare,
+    Undo,
+    Redo,
+    Type,
+    Pilcrow,
 } from "lucide-react";
 import { Canvas } from "@/types/canvas";
 import { useCanvasApi, ImproveAction } from "@/hooks/useCanvasApi";
 
+// Create lowlight instance for code highlighting
+const lowlight = createLowlight(common);
+
 // Rate limiting constants
-const MIN_LLM_CALL_INTERVAL = 2000; // Minimum 2 seconds between LLM calls
+const MIN_LLM_CALL_INTERVAL = 2000;
 
 interface CanvasEditorProps {
     canvasId: string;
     currentCanvas: Canvas | null;
     onCanvasUpdate: (canvas: Canvas) => void;
 }
+
+// Toolbar button component for consistency
+const ToolbarButton = ({
+    onClick,
+    isActive = false,
+    disabled = false,
+    tooltip,
+    children
+}: {
+    onClick: () => void;
+    isActive?: boolean;
+    disabled?: boolean;
+    tooltip: string;
+    children: React.ReactNode;
+}) => (
+    <TooltipProvider delayDuration={300}>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onClick}
+                    disabled={disabled}
+                    className={`h-8 w-8 p-0 ${isActive ? 'bg-accent text-accent-foreground' : ''}`}
+                >
+                    {children}
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+                {tooltip}
+            </TooltipContent>
+        </Tooltip>
+    </TooltipProvider>
+);
+
+// Divider component
+const ToolbarDivider = () => (
+    <div className="w-px h-6 bg-border mx-1" />
+);
 
 export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: CanvasEditorProps) => {
     const router = useRouter();
@@ -56,9 +138,36 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [isProcessingInstruction, setIsProcessingInstruction] = useState(false);
     const [isImproving, setIsImproving] = useState(false);
+    const [showMoreOptions, setShowMoreOptions] = useState(false);
 
     // Rate limiting for LLM calls
     const lastLLMCallRef = useRef<number>(0);
+
+    // Insert markdown content into editor (parses markdown to HTML first)
+    const insertMarkdownContent = useCallback((editor: Editor, content: string, from: number, to: number) => {
+        const cleanedContent = cleanMarkdown(content);
+
+        // Check if content contains markdown
+        if (containsMarkdown(cleanedContent)) {
+            // Convert markdown to HTML and insert
+            const html = markdownToHtml(cleanedContent);
+            editor.chain()
+                .setTextSelection({ from, to })
+                .deleteSelection()
+                .insertContent(html, {
+                    parseOptions: {
+                        preserveWhitespace: false,
+                    }
+                })
+                .run();
+        } else {
+            // Plain text - insert directly
+            editor.chain()
+                .setTextSelection({ from, to })
+                .insertContent(cleanedContent)
+                .run();
+        }
+    }, []);
 
     // Handle text improvement from bubble menu with rate limiting
     const handleImproveText = useCallback(async (editor: Editor, action: ImproveAction) => {
@@ -88,42 +197,21 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
             const improvedText = await improveText(canvasId, selectedText, action);
 
             if (improvedText) {
-                // Replace selected text with improved version
-                editor.chain()
-                    .setTextSelection({ from, to })
-                    .insertContent(improvedText)
-                    .run();
+                // Use markdown-aware insertion
+                insertMarkdownContent(editor, improvedText, from, to);
 
-                // Highlight the improved text
-                const newTo = from + improvedText.length;
+                // Get new end position
+                const newTo = editor.state.selection.to;
+
+                // Highlight the improved text briefly
                 setTimeout(() => {
                     if (editor && !editor.isDestroyed) {
-                        editor.chain()
-                            .setTextSelection({ from, to: newTo })
-                            .setMark('aiResponse')
-                            .run();
-
-                        // Clear selection
+                        // Remove highlight after 5 seconds
                         setTimeout(() => {
                             if (editor && !editor.isDestroyed) {
                                 editor.chain().setTextSelection(newTo).run();
                             }
-                        }, 50);
-
-                        // Remove highlight after 7 seconds
-                        setTimeout(() => {
-                            if (editor && !editor.isDestroyed) {
-                                editor.chain()
-                                    .setTextSelection({ from, to: newTo })
-                                    .unsetMark('aiResponse')
-                                    .run();
-                                setTimeout(() => {
-                                    if (editor && !editor.isDestroyed) {
-                                        editor.chain().setTextSelection(newTo).run();
-                                    }
-                                }, 50);
-                            }
-                        }, 7000);
+                        }, 100);
                     }
                 }, 100);
 
@@ -137,7 +225,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         } finally {
             setIsImproving(false);
         }
-    }, [currentCanvas, canvasId, improveText, isImproving]);
+    }, [currentCanvas, canvasId, improveText, isImproving, insertMarkdownContent]);
 
     // Handle @agent instruction execution with rate limiting
     const handleAgentInstruction = useCallback(async (editor: Editor, instruction: string, lineStart: number, lineEnd: number) => {
@@ -162,42 +250,8 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
             const response = await executeInstruction(canvasId, instruction);
 
             if (response) {
-                editor.chain()
-                    .setTextSelection({ from: lineStart, to: lineEnd })
-                    .insertContent(response)
-                    .run();
-
-                const responseLength = response.length;
-                setTimeout(() => {
-                    if (editor && !editor.isDestroyed) {
-                        editor.chain()
-                            .setTextSelection({ from: lineStart, to: lineStart + responseLength })
-                            .setMark('aiResponse')
-                            .run();
-
-                        setTimeout(() => {
-                            if (editor && !editor.isDestroyed) {
-                                const currentPos = editor.state.selection.to;
-                                editor.chain().setTextSelection(currentPos).run();
-                            }
-                        }, 50);
-
-                        setTimeout(() => {
-                            if (editor && !editor.isDestroyed) {
-                                editor.chain()
-                                    .setTextSelection({ from: lineStart, to: lineStart + responseLength })
-                                    .unsetMark('aiResponse')
-                                    .run();
-                                setTimeout(() => {
-                                    if (editor && !editor.isDestroyed) {
-                                        const currentPos = editor.state.selection.to;
-                                        editor.chain().setTextSelection(currentPos).run();
-                                    }
-                                }, 50);
-                            }
-                        }, 7000);
-                    }
-                }, 100);
+                // Use markdown-aware insertion
+                insertMarkdownContent(editor, response, lineStart, lineEnd);
 
                 toast.success('Instruction processed successfully!', {
                     id: 'agent-processing'
@@ -215,7 +269,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         } finally {
             setIsProcessingInstruction(false);
         }
-    }, [currentCanvas, canvasId, executeInstruction, isProcessingInstruction]);
+    }, [currentCanvas, canvasId, executeInstruction, isProcessingInstruction, insertMarkdownContent]);
 
     // Create plugin for @agent highlighting using decorations
     const agentHighlightPlugin = new Plugin({
@@ -300,20 +354,86 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         }
     });
 
-    // Initialize editor
+    // Initialize editor with all extensions
     const editor = useEditor({
         extensions: [
-            StarterKit,
-            Placeholder.configure({
-                placeholder: 'Start typing... (use @agent for AI commands)',
+            StarterKit.configure({
+                codeBlock: false, // We use CodeBlockLowlight instead
+                horizontalRule: false, // We use our own
             }),
+            Placeholder.configure({
+                placeholder: ({ node }) => {
+                    if (node.type.name === 'heading') {
+                        return 'Heading';
+                    }
+                    return 'Type \'/\' for commands, or \'@agent\' for AI...';
+                },
+            }),
+            Underline,
+            Link.configure({
+                openOnClick: false,
+                HTMLAttributes: {
+                    class: 'text-primary underline cursor-pointer',
+                },
+            }),
+            Highlight.configure({
+                multicolor: false,
+            }),
+            TaskList.configure({
+                HTMLAttributes: {
+                    class: 'task-list',
+                },
+            }),
+            TaskItem.configure({
+                nested: true,
+                HTMLAttributes: {
+                    class: 'task-item',
+                },
+            }),
+            CodeBlockLowlight.configure({
+                lowlight,
+                HTMLAttributes: {
+                    class: 'code-block',
+                },
+            }),
+            Typography,
+            HorizontalRule,
             AIResponse,
             AgentExtension,
+            SlashCommands,
         ],
         content: '',
         editorProps: {
             attributes: {
-                class: 'canvas-editor-content max-w-none min-h-[calc(100vh-200px)] focus:outline-none px-8 py-6',
+                class: 'canvas-editor-content max-w-none min-h-[calc(100vh-200px)] focus:outline-none px-12 py-8',
+            },
+            handlePaste: (view, event) => {
+                const clipboardData = event.clipboardData;
+                if (!clipboardData) return false;
+
+                const text = clipboardData.getData('text/plain');
+
+                // Check if pasted text contains markdown
+                if (text && containsMarkdown(text)) {
+                    event.preventDefault();
+
+                    const html = markdownToHtml(cleanMarkdown(text));
+                    const { from, to } = view.state.selection;
+
+                    // Create a new editor transaction
+                    editor?.chain()
+                        .setTextSelection({ from, to })
+                        .insertContent(html, {
+                            parseOptions: {
+                                preserveWhitespace: false,
+                            }
+                        })
+                        .run();
+
+                    return true;
+                }
+
+                return false;
             },
         },
         onUpdate: () => {
@@ -436,6 +556,23 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         };
     }, []);
 
+    // Add link handler
+    const setLink = useCallback(() => {
+        if (!editor) return;
+
+        const previousUrl = editor.getAttributes('link').href;
+        const url = window.prompt('Enter URL', previousUrl);
+
+        if (url === null) return;
+
+        if (url === '') {
+            editor.chain().focus().extendMarkRange('link').unsetLink().run();
+            return;
+        }
+
+        editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    }, [editor]);
+
     if (!currentCanvas) {
         return (
             <SidebarInset className="flex-1 flex flex-col">
@@ -456,28 +593,28 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
 
     return (
         <SidebarInset className="flex flex-col">
-            <header className="flex h-16 shrink-0 items-center px-4 border-b relative">
+            <header className="flex h-14 shrink-0 items-center px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 {/* Centered title */}
                 <div className="flex-1 flex justify-center">
                     <Input
                         value={canvasName}
                         onChange={(e) => handleTitleChange(e.target.value)}
-                        className="text-center text-lg font-semibold border-none shadow-none focus-visible:ring-1 focus-visible:ring-ring max-w-md"
+                        className="text-center text-base font-medium border-none shadow-none focus-visible:ring-1 focus-visible:ring-ring max-w-md h-9 bg-transparent"
                         placeholder="Untitled Canvas"
                     />
                 </div>
 
                 {/* Save status and button - right side */}
-                <div className="absolute right-4 flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="absolute right-4 flex items-center gap-3">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         {isAutoSaving && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                                 <div className="animate-spin rounded-full h-3 w-3 border-b border-primary"></div>
                                 <span>Saving...</span>
                             </div>
                         )}
                         {lastSaved && !isAutoSaving && (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5">
                                 <CheckCircle className="h-3 w-3 text-green-500" />
                                 <span>Saved</span>
                             </div>
@@ -488,87 +625,180 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                         disabled={isSaving}
                         size="sm"
                         variant="outline"
+                        className="h-8"
                     >
-                        <Save className="h-4 w-4 mr-2" />
+                        <Save className="h-3.5 w-3.5 mr-1.5" />
                         {isSaving ? 'Saving...' : 'Save'}
                     </Button>
                 </div>
             </header>
 
-            {/* Editor Toolbar */}
+            {/* Professional Toolbar */}
             {editor && (
-                <div className="flex items-center gap-1 p-3 border-b">
-                    <Button
-                        variant="ghost"
-                        size="sm"
+                <div className="flex items-center gap-0.5 px-4 py-2 border-b bg-muted/30">
+                    {/* Undo/Redo */}
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().undo().run()}
+                        disabled={!editor.can().undo()}
+                        tooltip="Undo (Ctrl+Z)"
+                    >
+                        <Undo className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().redo().run()}
+                        disabled={!editor.can().redo()}
+                        tooltip="Redo (Ctrl+Y)"
+                    >
+                        <Redo className="h-4 w-4" />
+                    </ToolbarButton>
+
+                    <ToolbarDivider />
+
+                    {/* Block Type Dropdown */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 gap-1 px-2">
+                                <Pilcrow className="h-4 w-4" />
+                                <span className="text-xs hidden sm:inline">
+                                    {editor.isActive('heading', { level: 1 }) ? 'Heading 1' :
+                                        editor.isActive('heading', { level: 2 }) ? 'Heading 2' :
+                                            editor.isActive('heading', { level: 3 }) ? 'Heading 3' :
+                                                editor.isActive('codeBlock') ? 'Code' :
+                                                    editor.isActive('blockquote') ? 'Quote' :
+                                                        'Paragraph'}
+                                </span>
+                                <ChevronDown className="h-3 w-3" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="min-w-[180px]">
+                            <DropdownMenuItem onClick={() => editor.chain().focus().setParagraph().run()}>
+                                <Type className="h-4 w-4 mr-2" />
+                                Paragraph
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
+                                <Heading1 className="h-4 w-4 mr-2" />
+                                Heading 1
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+                                <Heading2 className="h-4 w-4 mr-2" />
+                                Heading 2
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
+                                <Heading3 className="h-4 w-4 mr-2" />
+                                Heading 3
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+                                <Code2 className="h-4 w-4 mr-2" />
+                                Code Block
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+                                <Quote className="h-4 w-4 mr-2" />
+                                Quote
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <ToolbarDivider />
+
+                    {/* Text Formatting */}
+                    <ToolbarButton
                         onClick={() => editor.chain().focus().toggleBold().run()}
-                        className={editor.isActive('bold') ? 'bg-accent' : ''}
-                        disabled={!editor.can().chain().focus().toggleBold().run()}
+                        isActive={editor.isActive('bold')}
+                        tooltip="Bold (Ctrl+B)"
                     >
                         <Bold className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
+                    </ToolbarButton>
+                    <ToolbarButton
                         onClick={() => editor.chain().focus().toggleItalic().run()}
-                        className={editor.isActive('italic') ? 'bg-accent' : ''}
-                        disabled={!editor.can().chain().focus().toggleItalic().run()}
+                        isActive={editor.isActive('italic')}
+                        tooltip="Italic (Ctrl+I)"
                     >
                         <Italic className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-                        className={editor.isActive('heading', { level: 1 }) ? 'bg-accent' : ''}
-                        disabled={!editor.can().chain().focus().toggleHeading({ level: 1 }).run()}
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().toggleUnderline().run()}
+                        isActive={editor.isActive('underline')}
+                        tooltip="Underline (Ctrl+U)"
                     >
-                        <Hash className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => editor.chain().focus().toggleBulletList().run()}
-                        className={editor.isActive('bulletList') ? 'bg-accent' : ''}
-                        disabled={!editor.can().chain().focus().toggleBulletList().run()}
+                        <UnderlineIcon className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().toggleStrike().run()}
+                        isActive={editor.isActive('strike')}
+                        tooltip="Strikethrough"
                     >
-                        <List className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-                        className={editor.isActive('orderedList') ? 'bg-accent' : ''}
-                        disabled={!editor.can().chain().focus().toggleOrderedList().run()}
-                    >
-                        <ListOrdered className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => editor.chain().focus().toggleBlockquote().run()}
-                        className={editor.isActive('blockquote') ? 'bg-accent' : ''}
-                        disabled={!editor.can().chain().focus().toggleBlockquote().run()}
-                    >
-                        <Quote className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
+                        <Strikethrough className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
                         onClick={() => editor.chain().focus().toggleCode().run()}
-                        className={editor.isActive('code') ? 'bg-accent' : ''}
-                        disabled={!editor.can().chain().focus().toggleCode().run()}
+                        isActive={editor.isActive('code')}
+                        tooltip="Inline Code"
                     >
                         <Code className="h-4 w-4" />
-                    </Button>
-                    <div className="text-xs text-muted-foreground ml-auto flex items-center gap-4">
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().toggleHighlight().run()}
+                        isActive={editor.isActive('highlight')}
+                        tooltip="Highlight"
+                    >
+                        <Highlighter className="h-4 w-4" />
+                    </ToolbarButton>
+
+                    <ToolbarDivider />
+
+                    {/* Lists */}
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().toggleBulletList().run()}
+                        isActive={editor.isActive('bulletList')}
+                        tooltip="Bullet List"
+                    >
+                        <List className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                        isActive={editor.isActive('orderedList')}
+                        tooltip="Numbered List"
+                    >
+                        <ListOrdered className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().toggleTaskList().run()}
+                        isActive={editor.isActive('taskList')}
+                        tooltip="Task List"
+                    >
+                        <CheckSquare className="h-4 w-4" />
+                    </ToolbarButton>
+
+                    <ToolbarDivider />
+
+                    {/* Insert */}
+                    <ToolbarButton
+                        onClick={setLink}
+                        isActive={editor.isActive('link')}
+                        tooltip="Add Link"
+                    >
+                        <LinkIcon className="h-4 w-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+                        tooltip="Divider"
+                    >
+                        <Minus className="h-4 w-4" />
+                    </ToolbarButton>
+
+                    {/* Right side info */}
+                    <div className="flex-1" />
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         {isProcessingInstruction && (
-                            <div className="flex items-center gap-1">
-                                <Bot className="h-3 w-3 animate-pulse text-blue-500" />
-                                <span>Processing AI instruction...</span>
+                            <div className="flex items-center gap-1.5">
+                                <Bot className="h-3.5 w-3.5 animate-pulse text-blue-500" />
+                                <span>Processing...</span>
                             </div>
                         )}
-                        <span>Type @agent followed by your instruction</span>
+                        <span className="hidden md:inline opacity-60">
+                            Type <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">/</kbd> for commands
+                        </span>
                     </div>
                 </div>
             )}
@@ -585,13 +815,66 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                     }}
                     className="bubble-menu"
                 >
-                    <div className="flex flex-wrap items-center gap-0.5 bg-popover border border-border rounded-lg shadow-lg p-1.5 max-w-[95vw]">
+                    <div className="flex flex-wrap items-center gap-0.5 bg-popover border border-border rounded-lg shadow-xl p-1 max-w-[95vw]">
+                        {/* Text formatting in bubble menu */}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => editor.chain().focus().toggleBold().run()}
+                            className={`h-7 w-7 p-0 ${editor.isActive('bold') ? 'bg-accent' : ''}`}
+                        >
+                            <Bold className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => editor.chain().focus().toggleItalic().run()}
+                            className={`h-7 w-7 p-0 ${editor.isActive('italic') ? 'bg-accent' : ''}`}
+                        >
+                            <Italic className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => editor.chain().focus().toggleUnderline().run()}
+                            className={`h-7 w-7 p-0 ${editor.isActive('underline') ? 'bg-accent' : ''}`}
+                        >
+                            <UnderlineIcon className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => editor.chain().focus().toggleStrike().run()}
+                            className={`h-7 w-7 p-0 ${editor.isActive('strike') ? 'bg-accent' : ''}`}
+                        >
+                            <Strikethrough className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => editor.chain().focus().toggleCode().run()}
+                            className={`h-7 w-7 p-0 ${editor.isActive('code') ? 'bg-accent' : ''}`}
+                        >
+                            <Code className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={setLink}
+                            className={`h-7 w-7 p-0 ${editor.isActive('link') ? 'bg-accent' : ''}`}
+                        >
+                            <LinkIcon className="h-3.5 w-3.5" />
+                        </Button>
+
+                        <div className="w-px h-5 bg-border mx-0.5" />
+
+                        {/* AI Actions */}
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleImproveText(editor, 'improve')}
                             disabled={isImproving}
-                            className="h-7 px-2 text-xs gap-1 shrink-0"
+                            className="h-7 px-2 text-xs gap-1"
                             title="Improve writing"
                         >
                             {isImproving ? (
@@ -599,81 +882,101 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                             ) : (
                                 <Sparkles className="h-3.5 w-3.5" />
                             )}
-                            <span>Improve</span>
+                            <span className="hidden sm:inline">Improve</span>
                         </Button>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleImproveText(editor, 'rephrase')}
                             disabled={isImproving}
-                            className="h-7 px-2 text-xs gap-1 shrink-0"
-                            title="Rephrase text"
+                            className="h-7 px-2 text-xs gap-1"
                         >
                             <RefreshCw className="h-3.5 w-3.5" />
-                            <span>Rephrase</span>
+                            <span className="hidden sm:inline">Rephrase</span>
                         </Button>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleImproveText(editor, 'summarize')}
                             disabled={isImproving}
-                            className="h-7 px-2 text-xs gap-1 shrink-0"
-                            title="Summarize text"
+                            className="h-7 px-2 text-xs gap-1"
                         >
                             <AlignLeft className="h-3.5 w-3.5" />
-                            <span>Summarize</span>
+                            <span className="hidden sm:inline">Summarize</span>
                         </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleImproveText(editor, 'expand')}
-                            disabled={isImproving}
-                            className="h-7 px-2 text-xs gap-1 shrink-0"
-                            title="Expand text"
-                        >
-                            <Expand className="h-3.5 w-3.5" />
-                            <span>Expand</span>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleImproveText(editor, 'simplify')}
-                            disabled={isImproving}
-                            className="h-7 px-2 text-xs gap-1 shrink-0"
-                            title="Simplify text"
-                        >
-                            <Minimize2 className="h-3.5 w-3.5" />
-                            <span>Simplify</span>
-                        </Button>
-                        <div className="w-px h-5 bg-border mx-0.5 shrink-0" />
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleImproveText(editor, 'formal')}
-                            disabled={isImproving}
-                            className="h-7 px-2 text-xs gap-1 shrink-0"
-                            title="Make formal"
-                        >
-                            <Briefcase className="h-3.5 w-3.5" />
-                            <span>Formal</span>
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleImproveText(editor, 'casual')}
-                            disabled={isImproving}
-                            className="h-7 px-2 text-xs gap-1 shrink-0"
-                            title="Make casual"
-                        >
-                            <MessageCircle className="h-3.5 w-3.5" />
-                            <span>Casual</span>
-                        </Button>
+
+                        {/* More AI options - expandable inline */}
+                        {showMoreOptions ? (
+                            <>
+                                <div className="w-px h-5 bg-border mx-0.5" />
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleImproveText(editor, 'expand')}
+                                    disabled={isImproving}
+                                    className="h-7 px-2 text-xs gap-1"
+                                >
+                                    <Expand className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Expand</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleImproveText(editor, 'simplify')}
+                                    disabled={isImproving}
+                                    className="h-7 px-2 text-xs gap-1"
+                                >
+                                    <Minimize2 className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Simplify</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleImproveText(editor, 'formal')}
+                                    disabled={isImproving}
+                                    className="h-7 px-2 text-xs gap-1"
+                                >
+                                    <Briefcase className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Formal</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleImproveText(editor, 'casual')}
+                                    disabled={isImproving}
+                                    className="h-7 px-2 text-xs gap-1"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Casual</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setShowMoreOptions(false)}
+                                    className="h-7 px-2 text-xs gap-1"
+                                >
+                                    <ChevronLeft className="h-3 w-3" />
+                                    <span className="hidden sm:inline">Less</span>
+                                </Button>
+                            </>
+                        ) : (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowMoreOptions(true)}
+                                disabled={isImproving}
+                                className="h-7 px-2 text-xs gap-1"
+                            >
+                                <span className="hidden sm:inline">More</span>
+                                <ChevronRight className="h-3 w-3" />
+                            </Button>
+                        )}
                     </div>
                 </BubbleMenu>
             )}
 
             <main className="flex-1 overflow-auto relative">
-                <div className="w-full h-full">
+                <div className="w-full h-full max-w-4xl mx-auto">
                     <EditorContent
                         editor={editor}
                     />

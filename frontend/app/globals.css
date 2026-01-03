@@ -8,8 +8,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-roboto-mono), ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -47,7 +47,7 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --background: oklch(0.995 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -57,13 +57,13 @@
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted: oklch(0.965 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: oklch(0.96 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: oklch(0.91 0 0);
+  --input: oklch(0.91 0 0);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
@@ -81,34 +81,34 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.12 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.16 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.16 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --secondary: oklch(0.22 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.65 0 0);
+  --accent: oklch(0.22 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: oklch(0.14 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.22 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
@@ -120,24 +120,31 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
   }
 }
 
-/* Canvas Editor Styles - Notion-like clean spacing */
+/* ========================================
+   Canvas Editor Styles - Notion-like
+   ======================================== */
+
 .canvas-editor-content {
-  @apply text-foreground leading-relaxed;
+  @apply text-foreground;
+  font-family: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.7;
+  letter-spacing: -0.01em;
 }
 
 .canvas-editor-content .ProseMirror {
   outline: none;
+  min-height: 100%;
 }
 
-/* Paragraphs - minimal spacing */
+/* Paragraphs */
 .canvas-editor-content p {
   @apply my-1;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .canvas-editor-content p:first-child {
@@ -149,25 +156,37 @@
 }
 
 /* Placeholder styling */
+.canvas-editor-content .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  @apply text-muted-foreground/50;
+  pointer-events: none;
+  height: 0;
+  white-space: pre-wrap;
+  font-weight: 400;
+}
+
 .canvas-editor-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  @apply text-muted-foreground;
+  @apply text-muted-foreground/50;
   pointer-events: none;
   height: 0;
   white-space: pre-wrap;
 }
 
-/* Headings - clean hierarchy */
+/* Headings - Notion-like clean hierarchy */
 .canvas-editor-content h1,
 .canvas-editor-content h2,
 .canvas-editor-content h3,
 .canvas-editor-content h4,
 .canvas-editor-content h5,
 .canvas-editor-content h6 {
-  @apply font-semibold;
-  margin: 1.5rem 0 0.5rem 0;
+  font-family: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  @apply font-bold;
+  margin: 1.75rem 0 0.5rem 0;
   line-height: 1.3;
+  letter-spacing: -0.02em;
 }
 
 .canvas-editor-content h1:first-child,
@@ -180,30 +199,39 @@
 }
 
 .canvas-editor-content h1 {
-  @apply text-3xl;
+  font-size: 2rem;
+  font-weight: 700;
 }
 
 .canvas-editor-content h2 {
-  @apply text-2xl;
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
 .canvas-editor-content h3 {
-  @apply text-xl;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .canvas-editor-content h4 {
-  @apply text-lg;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .canvas-editor-content h5 {
-  @apply text-base;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .canvas-editor-content h6 {
-  @apply text-sm;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  @apply text-muted-foreground;
 }
 
-/* Lists - proper bullet styling and spacing */
+/* Lists */
 .canvas-editor-content ul,
 .canvas-editor-content ol {
   @apply my-2 pl-6;
@@ -212,24 +240,22 @@
 .canvas-editor-content ul li,
 .canvas-editor-content ol li {
   @apply my-0.5;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
-/* Bullet points styling */
-.canvas-editor-content ul li {
+.canvas-editor-content ul > li {
   @apply list-disc;
 }
 
-.canvas-editor-content ul li::marker {
+.canvas-editor-content ul > li::marker {
   @apply text-muted-foreground;
 }
 
-/* Numbered lists styling */
-.canvas-editor-content ol li {
+.canvas-editor-content ol > li {
   @apply list-decimal;
 }
 
-.canvas-editor-content ol li::marker {
+.canvas-editor-content ol > li::marker {
   @apply text-muted-foreground font-medium;
 }
 
@@ -241,14 +267,6 @@
   @apply my-1;
 }
 
-.canvas-editor-content ul ul li,
-.canvas-editor-content ul ol li,
-.canvas-editor-content ol ul li,
-.canvas-editor-content ol ol li {
-  @apply my-0.5;
-}
-
-/* List item content spacing */
 .canvas-editor-content li p {
   @apply my-0.5;
 }
@@ -261,18 +279,84 @@
   @apply mb-0;
 }
 
-/* Blockquotes */
-.canvas-editor-content blockquote {
-  @apply border-l-4 border-border my-2 pl-4 italic text-muted-foreground;
+/* Task List - Notion style */
+.canvas-editor-content ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
 }
 
-/* Code blocks - proper styling */
+.canvas-editor-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+}
+
+.canvas-editor-content ul[data-type="taskList"] li > label {
+  display: flex;
+  align-items: center;
+  user-select: none;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.canvas-editor-content ul[data-type="taskList"] li > label input[type="checkbox"] {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: transparent;
+}
+
+.canvas-editor-content ul[data-type="taskList"] li > label input[type="checkbox"]:hover {
+  border-color: var(--primary);
+}
+
+.canvas-editor-content ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+}
+
+.canvas-editor-content ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+.canvas-editor-content ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  @apply text-muted-foreground;
+}
+
+/* Nested task lists */
+.canvas-editor-content ul[data-type="taskList"] ul[data-type="taskList"] {
+  padding-left: 1.5rem;
+  margin-top: 0.25rem;
+}
+
+/* Blockquotes */
+.canvas-editor-content blockquote {
+  @apply border-l-4 border-border my-4 pl-4 text-muted-foreground;
+  font-style: italic;
+  background: linear-gradient(90deg, var(--muted) 0%, transparent 100%);
+  padding: 0.75rem 1rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.canvas-editor-content blockquote p {
+  @apply my-0;
+}
+
+/* Code blocks with syntax highlighting */
 .canvas-editor-content pre {
-  @apply bg-muted rounded-md p-3 my-3 overflow-x-auto;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas,
-    "Liberation Mono", Menlo, monospace;
+  @apply bg-muted rounded-lg my-4 overflow-x-auto;
+  font-family: var(--font-roboto-mono), ui-monospace, monospace;
   font-size: 0.875rem;
-  line-height: 1.5;
+  line-height: 1.6;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
 }
 
 .canvas-editor-content pre code {
@@ -280,41 +364,161 @@
   font-family: inherit;
   font-weight: 400;
   border-radius: 0;
+  color: inherit;
 }
 
 /* Inline code */
 .canvas-editor-content code {
-  @apply bg-muted rounded px-1.5 py-0.5 text-sm font-medium;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas,
-    "Liberation Mono", Menlo, monospace;
+  @apply rounded px-1.5 py-0.5 font-medium;
+  font-family: var(--font-roboto-mono), ui-monospace, monospace;
   font-size: 0.875em;
+  background: oklch(0.95 0 0);
+  color: oklch(0.4 0.15 350);
+}
+
+.dark .canvas-editor-content code {
+  background: oklch(0.25 0 0);
+  color: oklch(0.8 0.1 350);
 }
 
 /* Strong and emphasis */
 .canvas-editor-content strong {
-  @apply font-semibold;
+  @apply font-bold;
 }
 
 .canvas-editor-content em {
   @apply italic;
 }
 
-/* Horizontal rules */
-.canvas-editor-content hr {
-  @apply border-0 border-t border-border my-4;
+/* Underline */
+.canvas-editor-content u {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-/* Agent instruction hover tooltip */
+/* Strikethrough */
+.canvas-editor-content s {
+  text-decoration: line-through;
+  @apply text-muted-foreground;
+}
+
+/* Highlight */
+.canvas-editor-content mark {
+  background-color: oklch(0.95 0.15 90);
+  padding: 0.1em 0.2em;
+  border-radius: 0.2em;
+}
+
+.dark .canvas-editor-content mark {
+  background-color: oklch(0.45 0.15 90);
+  color: oklch(0.98 0 0);
+}
+
+/* Links */
+.canvas-editor-content a {
+  @apply text-primary underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.canvas-editor-content a:hover {
+  opacity: 0.8;
+}
+
+/* Horizontal rules */
+.canvas-editor-content hr {
+  @apply border-0 my-8;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+
+/* ========================================
+   Code Syntax Highlighting (Lowlight)
+   ======================================== */
+
+.canvas-editor-content pre .hljs-comment,
+.canvas-editor-content pre .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.canvas-editor-content pre .hljs-keyword,
+.canvas-editor-content pre .hljs-selector-tag,
+.canvas-editor-content pre .hljs-literal,
+.canvas-editor-content pre .hljs-section,
+.canvas-editor-content pre .hljs-link {
+  color: #d73a49;
+}
+
+.canvas-editor-content pre .hljs-string,
+.canvas-editor-content pre .hljs-title,
+.canvas-editor-content pre .hljs-name,
+.canvas-editor-content pre .hljs-type,
+.canvas-editor-content pre .hljs-attribute,
+.canvas-editor-content pre .hljs-symbol,
+.canvas-editor-content pre .hljs-bullet,
+.canvas-editor-content pre .hljs-addition,
+.canvas-editor-content pre .hljs-variable,
+.canvas-editor-content pre .hljs-template-tag,
+.canvas-editor-content pre .hljs-template-variable {
+  color: #22863a;
+}
+
+.canvas-editor-content pre .hljs-number,
+.canvas-editor-content pre .hljs-regexp,
+.canvas-editor-content pre .hljs-meta {
+  color: #005cc5;
+}
+
+.canvas-editor-content pre .hljs-built_in,
+.canvas-editor-content pre .hljs-builtin-name {
+  color: #6f42c1;
+}
+
+.canvas-editor-content pre .hljs-deletion {
+  color: #cb2431;
+}
+
+.dark .canvas-editor-content pre .hljs-keyword,
+.dark .canvas-editor-content pre .hljs-selector-tag,
+.dark .canvas-editor-content pre .hljs-literal {
+  color: #ff7b72;
+}
+
+.dark .canvas-editor-content pre .hljs-string,
+.dark .canvas-editor-content pre .hljs-title,
+.dark .canvas-editor-content pre .hljs-name {
+  color: #a5d6ff;
+}
+
+.dark .canvas-editor-content pre .hljs-number,
+.dark .canvas-editor-content pre .hljs-regexp {
+  color: #79c0ff;
+}
+
+.dark .canvas-editor-content pre .hljs-built_in {
+  color: #d2a8ff;
+}
+
+/* ========================================
+   Agent Instruction Styling
+   ======================================== */
+
+.agent-instruction-highlight {
+  position: relative;
+}
+
 .agent-instruction-highlight::after {
   content: attr(data-tooltip);
   position: absolute;
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgb(15, 23, 42);
+  background: oklch(0.15 0 0);
   color: white;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -324,6 +528,7 @@
   z-index: 1000;
   pointer-events: none;
   margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .agent-instruction-highlight::before {
@@ -332,14 +537,14 @@
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: rgb(15, 23, 42);
+  border: 6px solid transparent;
+  border-top-color: oklch(0.15 0 0);
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s ease;
   z-index: 1000;
   pointer-events: none;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .agent-instruction-highlight:hover::after,
@@ -348,23 +553,30 @@
   visibility: visible;
 }
 
-/* Dark mode tooltip styling */
 .dark .agent-instruction-highlight::after {
-  background: rgb(241, 245, 249);
-  color: rgb(15, 23, 42);
+  background: oklch(0.95 0 0);
+  color: oklch(0.15 0 0);
 }
 
 .dark .agent-instruction-highlight::before {
-  border-top-color: rgb(241, 245, 249);
+  border-top-color: oklch(0.95 0 0);
 }
 
-/* Bubble Menu Styling */
+/* ========================================
+   Bubble Menu Styling
+   ======================================== */
+
 .bubble-menu {
   z-index: 50;
 }
 
 .bubble-menu .bg-popover {
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  background: oklch(1 0 0 / 95%);
+}
+
+.dark .bubble-menu .bg-popover {
+  background: oklch(0.18 0 0 / 95%);
 }
 
 /* Ensure bubble menu doesn't get clipped */
@@ -374,4 +586,91 @@
 
 .tippy-content {
   padding: 0 !important;
+}
+
+/* ========================================
+   Slash Command Menu Styling
+   ======================================== */
+
+.slash-command-menu {
+  font-family: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  animation: slideDown 0.15s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slash-command-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.slash-command-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.slash-command-menu::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.slash-command-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* ========================================
+   Selection Styling
+   ======================================== */
+
+.canvas-editor-content ::selection {
+  background: oklch(0.9 0.08 250);
+}
+
+.dark .canvas-editor-content ::selection {
+  background: oklch(0.4 0.08 250);
+}
+
+/* ========================================
+   Keyboard shortcuts hint
+   ======================================== */
+
+kbd {
+  font-family: var(--font-roboto-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* ========================================
+   Responsive adjustments
+   ======================================== */
+
+@media (max-width: 640px) {
+  .canvas-editor-content {
+    font-size: 15px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .canvas-editor-content h1 {
+    font-size: 1.75rem;
+  }
+
+  .canvas-editor-content h2 {
+    font-size: 1.35rem;
+  }
+
+  .canvas-editor-content h3 {
+    font-size: 1.15rem;
+  }
 }

@@ -232,7 +232,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                 tr.doc.descendants((node, pos) => {
                     if (node.isText && node.text) {
                         const text = node.text;
-                        const agentPattern = /@agent\s+[^\n\r]+/g;
+                        const agentPattern = /@agent\s*[^\n\r]*/gi;
                         let match;
 
                         while ((match = agentPattern.exec(text)) !== null) {
@@ -281,7 +281,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                     const lineEnd = $from.end($from.depth);
                     const lineText = editor.state.doc.textBetween(lineStart, lineEnd);
 
-                    const agentPattern = /^@agent\s+(.+)$/;
+                    const agentPattern = /^@agent\s+(.+)$/i;
                     const match = lineText.match(agentPattern);
 
                     if (match && match[1].trim()) {

@@ -4,7 +4,6 @@ from typing import Optional, Literal
 
 class InstructionExecuteRequest(BaseModel):
     canvas_id: str = Field(..., description="Canvas ID for context")
-    user_id: str = Field(..., description="User ID for authorization")
     instruction: str = Field(
         ..., min_length=1, max_length=2000, description="AI instruction to execute"
     )
@@ -16,11 +15,11 @@ class InstructionExecuteResponse(BaseModel):
     )
     response: str = Field(..., description="AI generated response")
     error: Optional[str] = Field(None, description="Error message if execution failed")
+    credits_remaining: Optional[int] = Field(None, description="Remaining credits after operation")
 
 
 class ImproveTextRequest(BaseModel):
     canvas_id: str = Field(..., description="Canvas ID for context")
-    user_id: str = Field(..., description="User ID for authorization")
     selected_text: str = Field(
         ..., min_length=1, max_length=10000, description="Text selected by the user"
     )
@@ -35,3 +34,4 @@ class ImproveTextResponse(BaseModel):
     error: Optional[str] = Field(
         None, description="Error message if improvement failed"
     )
+    credits_remaining: Optional[int] = Field(None, description="Remaining credits after operation")

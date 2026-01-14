@@ -7,6 +7,7 @@ import {
     Sidebar,
     SidebarContent,
     SidebarHeader,
+    SidebarFooter,
     SidebarTrigger,
 } from "@/components/ui/sidebar";
 import {
@@ -14,10 +15,13 @@ import {
     FileText,
     Search,
     Heart,
-    Calendar
+    Calendar,
+    Coins,
+    LogOut
 } from "lucide-react";
 import { Canvas } from "@/types/canvas";
 import { CanvasItem } from "./CanvasItem";
+import { useAuthContext } from "./AuthProvider";
 
 interface CanvasSidebarProps {
     canvases: Canvas[];
@@ -39,6 +43,7 @@ export const CanvasSidebar = ({
     currentCanvasId
 }: CanvasSidebarProps) => {
     const [searchTerm, setSearchTerm] = useState("");
+    const { user, credits, signOut } = useAuthContext();
 
     // Filter canvases based on search term
     const filteredCanvases = canvases.filter(canvas =>
@@ -159,6 +164,53 @@ export const CanvasSidebar = ({
                     )}
                 </div>
             </SidebarContent>
+            
+            {/* Footer with user info and credits */}
+            <SidebarFooter className="p-4 border-t border-border">
+                <div className="space-y-3 group-data-[collapsible=icon]:hidden">
+                    {/* Credits Display */}
+                    <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-2">
+                            <Coins className="h-4 w-4 text-amber-500" />
+                            <span className="text-sm font-medium">Credits</span>
+                        </div>
+                        <span className="text-sm font-bold text-amber-500">
+                            {credits ?? '—'}
+                        </span>
+                    </div>
+                    
+                    {/* User Email */}
+                    <div className="px-2 text-xs text-muted-foreground truncate">
+                        {user?.email}
+                    </div>
+                    
+                    {/* Sign Out Button */}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={signOut}
+                        className="w-full justify-start text-muted-foreground hover:text-foreground"
+                    >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign out
+                    </Button>
+                </div>
+                
+                {/* Collapsed state - just show icons */}
+                <div className="hidden group-data-[collapsible=icon]:flex flex-col items-center gap-2">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-md bg-muted/50">
+                        <Coins className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={signOut}
+                        className="text-muted-foreground hover:text-foreground"
+                    >
+                        <LogOut className="h-4 w-4" />
+                    </Button>
+                </div>
+            </SidebarFooter>
         </Sidebar>
     );
 }; 

@@ -14,7 +14,6 @@ export interface CanvasCreateRequest {
     name: string;
     description?: string;
     content: Record<string, unknown>;
-    user_id: string;
     is_favorite?: boolean;
     tags?: string[];
 }
@@ -58,7 +57,4 @@ export interface DeleteCanvasResponse {
     error?: ApiError;
 }
 
-export const API_BASE_URL = 'http://localhost:8000/api/v1';
-
-// TODO: Replace with actual user ID from authentication
-export const USER_ID = 'user123'; 
+export const API_BASE_URL = 'http://localhost:8000/api/v1'; 

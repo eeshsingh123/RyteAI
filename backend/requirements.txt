@@ -4,3 +4,6 @@ motor
 pydantic-settings
 python-dotenv
 google-genai
+python-jose[cryptography]
+supabase
+httpx

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/components/AuthProvider";
 
 const roboto = Roboto({
     variable: "--font-roboto",
@@ -32,7 +33,9 @@ export default function RootLayout({
             <body
                 className={`${roboto.variable} ${robotoMono.variable} font-sans antialiased`}
             >
-                {children}
+                <AuthProvider>
+                    {children}
+                </AuthProvider>
                 <Toaster />
             </body>
         </html>

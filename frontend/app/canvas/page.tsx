@@ -10,8 +10,9 @@ import {
 import { Plus, FileText } from "lucide-react";
 import { useCanvasApi } from "@/hooks/useCanvasApi";
 import { CanvasSidebar } from "@/components/CanvasSidebar";
+import { AuthGuard } from "@/components/AuthGuard";
 
-export default function CanvasPage() {
+function CanvasPageContent() {
     const router = useRouter();
     const {
         isLoading,
@@ -80,5 +81,13 @@ export default function CanvasPage() {
                 </main>
             </SidebarInset>
         </SidebarProvider>
+    );
+}
+
+export default function CanvasPage() {
+    return (
+        <AuthGuard>
+            <CanvasPageContent />
+        </AuthGuard>
     );
 } 

@@ -26,10 +26,10 @@ class CanvasBase(BaseModel):
     content: Dict[str, Any] = Field(default_factory=dict, description="Canvas content data")
     is_favorite: bool = Field(default=False, description="Whether canvas is marked as favorite")
     tags: list[str] = Field(default_factory=list, description="Canvas tags")
-    user_id: str = Field(..., description="User ID who owns the canvas")
 
 
 class CanvasCreate(CanvasBase):
+    """Request schema for creating a canvas. user_id comes from JWT, not request body."""
     pass
 
 

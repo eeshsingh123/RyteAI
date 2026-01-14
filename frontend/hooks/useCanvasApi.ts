@@ -1,11 +1,13 @@
+'use client';
+
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { useAuthContext } from '@/components/AuthProvider';
 import {
     Canvas,
     CanvasCreateRequest,
     CanvasUpdateRequest,
     API_BASE_URL,
-    USER_ID
 } from '@/types/canvas';
 
 export type ImproveAction = 'improve' | 'rephrase' | 'summarize' | 'expand' | 'simplify' | 'formal' | 'casual';
@@ -13,6 +15,7 @@ export type ImproveAction = 'improve' | 'rephrase' | 'summarize' | 'expand' | 's
 export const useCanvasApi = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [canvases, setCanvases] = useState<Canvas[]>([]);
+    const { getAccessToken, updateCredits } = useAuthContext();
 
     const handleApiError = useCallback((error: unknown, defaultMessage: string) => {
         console.error(error);
@@ -28,15 +31,42 @@ export const useCanvasApi = () => {
         };
     }, []);
 
+    // Helper to get auth headers
+    const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
+        const token = await getAccessToken();
+        if (!token) {
+            throw new Error('Not authenticated');
+        }
+        return {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        };
+    }, [getAccessToken]);
+
+    // Helper to handle 401/402 errors
+    const handleAuthError = useCallback((response: Response) => {
+        if (response.status === 401) {
+            toast.error('Session expired. Please sign in again.');
+            return true;
+        }
+        if (response.status === 402) {
+            toast.error('Insufficient credits. Please add more credits to continue.');
+            return true;
+        }
+        return false;
+    }, []);
+
     const getCanvases = useCallback(async (favoritesOnly: boolean = false): Promise<Canvas[]> => {
         setIsLoading(true);
         try {
+            const headers = await getAuthHeaders();
             const params = new URLSearchParams({
-                user_id: USER_ID,
                 favorites_only: favoritesOnly.toString()
             });
 
-            const response = await fetch(`${API_BASE_URL}/canvas/?${params}`);
+            const response = await fetch(`${API_BASE_URL}/canvas/?${params}`, { headers });
+
+            if (handleAuthError(response)) return [];
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch canvases: ${response.status}`);
@@ -52,12 +82,15 @@ export const useCanvasApi = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [handleApiError, transformCanvas]);
+    }, [getAuthHeaders, handleApiError, handleAuthError, transformCanvas]);
 
     const getCanvas = useCallback(async (canvasId: string): Promise<Canvas | null> => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/canvas/${canvasId}`);
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/canvas/${canvasId}`, { headers });
+
+            if (handleAuthError(response)) return null;
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -74,21 +107,19 @@ export const useCanvasApi = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [handleApiError, transformCanvas]);
+    }, [getAuthHeaders, handleApiError, handleAuthError, transformCanvas]);
 
     const createCanvas = useCallback(async (canvasData: Omit<CanvasCreateRequest, 'user_id'>): Promise<Canvas | null> => {
         setIsLoading(true);
         try {
+            const headers = await getAuthHeaders();
             const response = await fetch(`${API_BASE_URL}/canvas/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ...canvasData,
-                    user_id: USER_ID
-                })
+                headers,
+                body: JSON.stringify(canvasData)
             });
+
+            if (handleAuthError(response)) return null;
 
             if (!response.ok) {
                 throw new Error(`Failed to create canvas: ${response.status}`);
@@ -105,18 +136,19 @@ export const useCanvasApi = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [handleApiError, transformCanvas]);
+    }, [getAuthHeaders, handleApiError, handleAuthError, transformCanvas]);
 
     const updateCanvas = useCallback(async (canvasId: string, updates: CanvasUpdateRequest): Promise<Canvas | null> => {
         setIsLoading(true);
         try {
+            const headers = await getAuthHeaders();
             const response = await fetch(`${API_BASE_URL}/canvas/${canvasId}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify(updates)
             });
+
+            if (handleAuthError(response)) return null;
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -135,17 +167,18 @@ export const useCanvasApi = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [handleApiError, transformCanvas]);
+    }, [getAuthHeaders, handleApiError, handleAuthError, transformCanvas]);
 
     const toggleFavorite = useCallback(async (canvasId: string, isFavorite: boolean): Promise<Canvas | null> => {
         try {
+            const headers = await getAuthHeaders();
             const response = await fetch(`${API_BASE_URL}/canvas/${canvasId}/favorite`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({ is_favorite: isFavorite })
             });
+
+            if (handleAuthError(response)) return null;
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -163,17 +196,18 @@ export const useCanvasApi = () => {
             handleApiError(error, 'Failed to toggle favorite');
             return null;
         }
-    }, [handleApiError, transformCanvas]);
+    }, [getAuthHeaders, handleApiError, handleAuthError, transformCanvas]);
 
     const renameCanvas = useCallback(async (canvasId: string, name: string): Promise<Canvas | null> => {
         try {
+            const headers = await getAuthHeaders();
             const response = await fetch(`${API_BASE_URL}/canvas/${canvasId}/rename`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({ name })
             });
+
+            if (handleAuthError(response)) return null;
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -191,14 +225,18 @@ export const useCanvasApi = () => {
             handleApiError(error, 'Failed to rename canvas');
             return null;
         }
-    }, [handleApiError, transformCanvas]);
+    }, [getAuthHeaders, handleApiError, handleAuthError, transformCanvas]);
 
     const deleteCanvas = useCallback(async (canvasId: string): Promise<boolean> => {
         setIsLoading(true);
         try {
+            const headers = await getAuthHeaders();
             const response = await fetch(`${API_BASE_URL}/canvas/${canvasId}`, {
                 method: 'DELETE',
+                headers,
             });
+
+            if (handleAuthError(response)) return false;
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -216,21 +254,21 @@ export const useCanvasApi = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [handleApiError]);
+    }, [getAuthHeaders, handleApiError, handleAuthError]);
 
     const executeInstruction = useCallback(async (canvasId: string, instruction: string): Promise<string | null> => {
         try {
+            const headers = await getAuthHeaders();
             const response = await fetch(`${API_BASE_URL}/ai/execute-instruction`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({
                     canvas_id: canvasId,
-                    user_id: USER_ID,
                     instruction: instruction
                 })
             });
+
+            if (handleAuthError(response)) return null;
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -244,6 +282,11 @@ export const useCanvasApi = () => {
 
             const data = await response.json();
 
+            // Update credits if returned
+            if (data.credits_remaining !== null && data.credits_remaining !== undefined) {
+                updateCredits(data.credits_remaining);
+            }
+
             if (!data.success) {
                 throw new Error(data.error || 'Failed to process instruction');
             }
@@ -253,7 +296,7 @@ export const useCanvasApi = () => {
             handleApiError(error, 'Failed to execute AI instruction');
             return null;
         }
-    }, [handleApiError]);
+    }, [getAuthHeaders, handleApiError, handleAuthError, updateCredits]);
 
     const improveText = useCallback(async (
         canvasId: string, 
@@ -261,18 +304,18 @@ export const useCanvasApi = () => {
         action: ImproveAction
     ): Promise<string | null> => {
         try {
+            const headers = await getAuthHeaders();
             const response = await fetch(`${API_BASE_URL}/ai/improve-text`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify({
                     canvas_id: canvasId,
-                    user_id: USER_ID,
                     selected_text: selectedText,
                     action: action
                 })
             });
+
+            if (handleAuthError(response)) return null;
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -286,6 +329,11 @@ export const useCanvasApi = () => {
 
             const data = await response.json();
 
+            // Update credits if returned
+            if (data.credits_remaining !== null && data.credits_remaining !== undefined) {
+                updateCredits(data.credits_remaining);
+            }
+
             if (!data.success) {
                 throw new Error(data.error || 'Failed to improve text');
             }
@@ -295,7 +343,26 @@ export const useCanvasApi = () => {
             handleApiError(error, 'Failed to improve text');
             return null;
         }
-    }, [handleApiError]);
+    }, [getAuthHeaders, handleApiError, handleAuthError, updateCredits]);
+
+    const getCredits = useCallback(async (): Promise<number | null> => {
+        try {
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_BASE_URL}/ai/credits`, { headers });
+
+            if (handleAuthError(response)) return null;
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch credits: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.credits;
+        } catch (error) {
+            handleApiError(error, 'Failed to fetch credits');
+            return null;
+        }
+    }, [getAuthHeaders, handleApiError, handleAuthError]);
 
     return {
         isLoading,
@@ -309,6 +376,7 @@ export const useCanvasApi = () => {
         renameCanvas,
         deleteCanvas,
         executeInstruction,
-        improveText
+        improveText,
+        getCredits
     };
 };

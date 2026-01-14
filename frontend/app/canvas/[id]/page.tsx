@@ -7,8 +7,9 @@ import { Canvas } from "@/types/canvas";
 import { useCanvasApi } from "@/hooks/useCanvasApi";
 import { CanvasSidebar } from "@/components/CanvasSidebar";
 import { CanvasEditor } from "@/components/CanvasEditor";
+import { AuthGuard } from "@/components/AuthGuard";
 
-export default function CanvasEditorPage() {
+function CanvasEditorPageContent() {
     const router = useRouter();
     const params = useParams();
     const canvasId = params.id as string;
@@ -155,5 +156,13 @@ export default function CanvasEditorPage() {
                 onCanvasUpdate={handleCanvasUpdate}
             />
         </SidebarProvider>
+    );
+}
+
+export default function CanvasEditorPage() {
+    return (
+        <AuthGuard>
+            <CanvasEditorPageContent />
+        </AuthGuard>
     );
 }

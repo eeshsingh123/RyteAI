@@ -1,17 +1,34 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthContext } from './AuthProvider';
-import { Loader2 } from 'lucide-react';
+import { PenTool } from 'lucide-react';
 
 interface AuthGuardProps {
     children: React.ReactNode;
 }
 
+const loadingQuotes = [
+    "Great writing is rewriting...",
+    "Every word matters...",
+    "Crafting your experience...",
+    "Ideas taking shape...",
+    "Your canvas awaits...",
+    "Preparing your workspace...",
+    "Creativity is thinking up new things...",
+    "Writing is the painting of the voice..."
+];
+
 export function AuthGuard({ children }: AuthGuardProps) {
     const { isAuthenticated, isLoading } = useAuthContext();
     const router = useRouter();
+    const [quote, setQuote] = useState('');
+
+    useEffect(() => {
+        // Set a random quote when component mounts
+        setQuote(loadingQuotes[Math.floor(Math.random() * loadingQuotes.length)]);
+    }, []);
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
@@ -21,10 +38,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-zinc-950">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-                    <p className="text-zinc-400 text-sm">Loading...</p>
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="flex flex-col items-center gap-6">
+                    <div className="w-16 h-16 rounded-2xl bg-foreground flex items-center justify-center animate-pulse">
+                        <PenTool className="h-8 w-8 text-background" />
+                    </div>
+                    <p className="text-muted-foreground text-sm font-medium animate-pulse">
+                        {quote}
+                    </p>
                 </div>
             </div>
         );

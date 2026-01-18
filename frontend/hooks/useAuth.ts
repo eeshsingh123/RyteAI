@@ -58,7 +58,7 @@ export function useAuth() {
         const initAuth = async () => {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
-                
+
                 let credits = null;
                 if (session?.user) {
                     credits = await fetchCredits(session.user.id);
@@ -168,9 +168,29 @@ export function useAuth() {
 
     // Get access token for API calls
     const getAccessToken = useCallback(async (): Promise<string | null> => {
-        const { data: { session } } = await supabase.auth.getSession();
-        return session?.access_token ?? null;
-    }, []);
+        // First, try to use the session already in state (fast path)
+        if (authState.session?.access_token) {
+            // Check if token is still valid (with 60s buffer)
+            const expiresAt = authState.session.expires_at;
+            if (expiresAt && expiresAt * 1000 > Date.now() + 60000) {
+                return authState.session.access_token;
+            }
+        }
+
+        // Session expired or not in state - try to refresh
+        try {
+            const { data: { session }, error } = await supabase.auth.refreshSession();
+            if (error || !session) {
+                // Fallback to getSession if refresh fails
+                const { data } = await supabase.auth.getSession();
+                return data.session?.access_token ?? null;
+            }
+            return session.access_token;
+        } catch (error) {
+            console.error('Error getting access token:', error);
+            return null;
+        }
+    }, [authState.session]);
 
     // Refresh credits (call after AI operations)
     const refreshCredits = useCallback(async () => {

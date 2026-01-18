@@ -24,7 +24,7 @@ export const AIResponse = Mark.create({
             {
                 ...HTMLAttributes,
                 'data-ai-response': '',
-                style: 'background-color: rgba(34, 197, 94, 0.15); color: rgb(34, 197, 94); padding: 2px 4px; border-radius: 4px; font-weight: 500; transition: all 0.3s ease;'
+                style: 'background-color: rgba(34, 197, 94, 0.2); color: inherit; border-radius: 2px; transition: background-color 0.3s ease;'
             },
             0,
         ]

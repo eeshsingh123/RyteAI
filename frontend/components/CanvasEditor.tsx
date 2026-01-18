@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useEditor, EditorContent, JSONContent, Editor, BubbleMenu } from "@tiptap/react";
@@ -200,18 +202,37 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
                 // Use markdown-aware insertion
                 insertMarkdownContent(editor, improvedText, from, to);
 
-                // Get new end position
+                // Get the new selection range after insertion
                 const newTo = editor.state.selection.to;
+                const insertedFrom = from;
+                const insertedTo = newTo;
 
-                // Highlight the improved text briefly
+                // Apply green highlight to the improved text
                 setTimeout(() => {
                     if (editor && !editor.isDestroyed) {
-                        // Remove highlight after 5 seconds
+                        editor.chain()
+                            .setTextSelection({ from: insertedFrom, to: insertedTo })
+                            .setMark('aiResponse')
+                            .setTextSelection(insertedTo)
+                            .run();
+
+                        // Remove highlight after 5 seconds by removing all aiResponse marks from the document
                         setTimeout(() => {
                             if (editor && !editor.isDestroyed) {
-                                editor.chain().setTextSelection(newTo).run();
+                                // Remove all aiResponse marks from the entire document
+                                const { doc } = editor.state;
+                                const tr = editor.state.tr;
+                                doc.descendants((node, pos) => {
+                                    if (node.isText) {
+                                        const marks = node.marks.filter(mark => mark.type.name === 'aiResponse');
+                                        if (marks.length > 0) {
+                                            tr.removeMark(pos, pos + node.nodeSize, editor.schema.marks.aiResponse);
+                                        }
+                                    }
+                                });
+                                editor.view.dispatch(tr);
                             }
-                        }, 100);
+                        }, 5000);
                     }
                 }, 100);
 
@@ -252,6 +273,40 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
             if (response) {
                 // Use markdown-aware insertion
                 insertMarkdownContent(editor, response, lineStart, lineEnd);
+
+                // Get the new selection range after insertion
+                const newTo = editor.state.selection.to;
+                const insertedFrom = lineStart;
+                const insertedTo = newTo;
+
+                // Apply green highlight to the response text
+                setTimeout(() => {
+                    if (editor && !editor.isDestroyed) {
+                        editor.chain()
+                            .setTextSelection({ from: insertedFrom, to: insertedTo })
+                            .setMark('aiResponse')
+                            .setTextSelection(insertedTo)
+                            .run();
+
+                        // Remove highlight after 5 seconds by removing all aiResponse marks from the document
+                        setTimeout(() => {
+                            if (editor && !editor.isDestroyed) {
+                                // Remove all aiResponse marks from the entire document
+                                const { doc } = editor.state;
+                                const tr = editor.state.tr;
+                                doc.descendants((node, pos) => {
+                                    if (node.isText) {
+                                        const marks = node.marks.filter(mark => mark.type.name === 'aiResponse');
+                                        if (marks.length > 0) {
+                                            tr.removeMark(pos, pos + node.nodeSize, editor.schema.marks.aiResponse);
+                                        }
+                                    }
+                                });
+                                editor.view.dispatch(tr);
+                            }
+                        }, 5000);
+                    }
+                }, 100);
 
                 toast.success('Instruction processed successfully!', {
                     id: 'agent-processing'
@@ -445,15 +500,45 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
     const contentDebounceRef = useRef<NodeJS.Timeout | null>(null);
     const titleDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Helper function to strip aiResponse marks from JSON content before saving
+    // This prevents temporary highlight marks from being persisted
+    const stripAiResponseMarks = useCallback((content: JSONContent): JSONContent => {
+        const stripFromNode = (node: JSONContent): JSONContent => {
+            const result = { ...node };
+
+            // Remove aiResponse from marks array
+            if (result.marks) {
+                result.marks = result.marks.filter(mark =>
+                    typeof mark === 'string' ? mark !== 'aiResponse' : mark.type !== 'aiResponse'
+                );
+                if (result.marks.length === 0) {
+                    delete result.marks;
+                }
+            }
+
+            // Recursively process content array
+            if (result.content && Array.isArray(result.content)) {
+                result.content = result.content.map(stripFromNode);
+            }
+
+            return result;
+        };
+
+        return stripFromNode(content);
+    }, []);
+
     // Extract common save logic
     const saveCanvas = useCallback(async (name: string, content: JSONContent) => {
         if (!currentCanvas) return;
+
+        // Strip temporary aiResponse marks before saving
+        const cleanContent = stripAiResponseMarks(content);
 
         setIsAutoSaving(true);
         try {
             const updatedCanvas = await updateCanvas(canvasId, {
                 name,
-                content
+                content: cleanContent
             });
 
             if (updatedCanvas) {
@@ -465,7 +550,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         } finally {
             setIsAutoSaving(false);
         }
-    }, [currentCanvas, canvasId, updateCanvas, onCanvasUpdate]);
+    }, [currentCanvas, canvasId, updateCanvas, onCanvasUpdate, stripAiResponseMarks]);
 
     // Debounced auto-save function for content
     const handleAutoSave = useCallback(() => {
@@ -515,9 +600,11 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         setIsSaving(true);
         try {
             const content = editor.getJSON();
+            // Strip temporary aiResponse marks before saving
+            const cleanContent = stripAiResponseMarks(content);
             const updatedCanvas = await updateCanvas(canvasId, {
                 name: canvasName,
-                content: content
+                content: cleanContent
             });
 
             if (updatedCanvas) {
@@ -529,7 +616,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
         } finally {
             setIsSaving(false);
         }
-    }, [currentCanvas, editor, canvasId, canvasName, updateCanvas, onCanvasUpdate]);
+    }, [currentCanvas, editor, canvasId, canvasName, updateCanvas, onCanvasUpdate, stripAiResponseMarks]);
 
     // Handle manual save keyboard shortcut (Ctrl+S)
     useEffect(() => {
@@ -592,7 +679,7 @@ export const CanvasEditor = ({ canvasId, currentCanvas, onCanvasUpdate }: Canvas
     }
 
     return (
-        <SidebarInset className="flex flex-col">
+        <SidebarInset className="flex flex-col h-screen overflow-hidden">
             <header className="flex h-14 shrink-0 items-center px-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 {/* Centered title */}
                 <div className="flex-1 flex justify-center">

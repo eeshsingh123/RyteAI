@@ -67,6 +67,10 @@ class LLMService:
                     max_output_tokens=2048,
                 ),
             )
+            # Handle case where response.text might be None
+            if response.text is None:
+                logger.warning("LLM returned None response for instruction")
+                raise ValueError("LLM returned an empty response. Please try again.")
             return response.text.strip()
         except Exception as e:
             logger.error(f"Error executing instruction: {e}")
@@ -91,13 +95,12 @@ class LLMService:
 
         try:
             response = await self.client.aio.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.7,
-                    max_output_tokens=2048,
-                ),
+                model=self.model_name, contents=prompt
             )
+            # Handle case where response.text might be None
+            if response.text is None:
+                logger.warning("LLM returned None response for text improvement")
+                raise ValueError("LLM returned an empty response. Please try again.")
             return response.text.strip()
         except Exception as e:
             logger.error(f"Error improving text: {e}")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,10 +23,22 @@ function CanvasPageContent() {
         toggleFavorite,
     } = useCanvasApi();
 
-    // Load canvases on mount
+    // Ref to prevent duplicate fetches on mount
+    const hasFetchedCanvases = useRef(false);
+
+    // Load canvases on mount only once
     useEffect(() => {
+        // Only fetch if we haven't already
+        if (hasFetchedCanvases.current) return;
+        hasFetchedCanvases.current = true;
         getCanvases();
-    }, [getCanvases]);
+        
+        // Reset the ref on unmount to handle StrictMode double-mounting
+        return () => {
+            hasFetchedCanvases.current = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Create new canvas
     const handleCreateCanvas = async () => {

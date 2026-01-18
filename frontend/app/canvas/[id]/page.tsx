@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Canvas } from "@/types/canvas";
 import { useCanvasApi } from "@/hooks/useCanvasApi";
 import { CanvasSidebar } from "@/components/CanvasSidebar";
 import { CanvasEditor } from "@/components/CanvasEditor";
+import { AgentChat } from "@/components/AgentChat";
 import { AuthGuard } from "@/components/AuthGuard";
+import { toast } from "sonner";
 
 function CanvasEditorPageContent() {
     const router = useRouter();
@@ -27,20 +29,39 @@ function CanvasEditorPageContent() {
 
     const [currentCanvas, setCurrentCanvas] = useState<Canvas | null>(null);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
-    const [isInitialized, setIsInitialized] = useState(false);
+    const [showAgentChat, setShowAgentChat] = useState(true);
+
+    // Refs to track initialization and prevent duplicate fetches
+    const hasFetchedCanvases = useRef(false);
+    const hasFetchedCurrentCanvas = useRef<string | null>(null);
+    const isFetchingCanvas = useRef(false);
 
     // Load canvases list once on mount (for sidebar)
     useEffect(() => {
+        if (hasFetchedCanvases.current) return;
+        hasFetchedCanvases.current = true;
         getCanvases();
-    }, [getCanvases]);
+
+        // Reset the ref on unmount to handle StrictMode double-mounting
+        return () => {
+            hasFetchedCanvases.current = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Load specific canvas ONLY on initial mount or when canvasId actually changes
     useEffect(() => {
         const loadCanvas = async () => {
-            // Don't reload if we're already initialized and have the right canvas
-            if (isInitialized && currentCanvas?.id === canvasId) {
+            // Prevent duplicate fetches
+            if (isFetchingCanvas.current) return;
+
+            // Don't reload if we've already fetched this specific canvas
+            if (hasFetchedCurrentCanvas.current === canvasId && currentCanvas?.id === canvasId) {
+                setIsInitialLoading(false);
                 return;
             }
+
+            isFetchingCanvas.current = true;
 
             try {
                 // First check if we have this canvas in our local list
@@ -53,7 +74,7 @@ function CanvasEditorPageContent() {
 
                 if (canvas) {
                     setCurrentCanvas(canvas);
-                    setIsInitialized(true);
+                    hasFetchedCurrentCanvas.current = canvasId;
                 } else {
                     router.push('/canvas');
                 }
@@ -62,18 +83,21 @@ function CanvasEditorPageContent() {
                 router.push('/canvas');
             } finally {
                 setIsInitialLoading(false);
+                isFetchingCanvas.current = false;
             }
         };
 
         if (canvasId) {
             loadCanvas();
         }
-    }, [canvasId, canvases, getCanvas, router, currentCanvas?.id, isInitialized]); // Include necessary dependencies
+        // Only depend on canvasId - other deps would cause infinite loops
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [canvasId]);
 
-    // Reset initialization when navigating to different canvas
+    // Reset fetch tracking when navigating to different canvas
     useEffect(() => {
         if (currentCanvas && currentCanvas.id !== canvasId) {
-            setIsInitialized(false);
+            hasFetchedCurrentCanvas.current = null;
         }
     }, [canvasId, currentCanvas]);
 
@@ -125,6 +149,25 @@ function CanvasEditorPageContent() {
         setCanvases(prev => prev.map(c => c.id === updatedCanvas.id ? updatedCanvas : c));
     }, [setCanvases]);
 
+    // Handle canvas modified by agent - reload from server
+    const handleCanvasModified = useCallback(async () => {
+        try {
+            const updatedCanvas = await getCanvas(canvasId);
+            if (updatedCanvas) {
+                setCurrentCanvas(updatedCanvas);
+                setCanvases(prev => prev.map(c => c.id === updatedCanvas.id ? updatedCanvas : c));
+                toast.success('Canvas updated by agent');
+            }
+        } catch (error) {
+            console.error('Error reloading canvas:', error);
+        }
+    }, [canvasId, getCanvas, setCanvases]);
+
+    // Toggle agent chat visibility
+    const toggleAgentChat = useCallback(() => {
+        setShowAgentChat(prev => !prev);
+    }, []);
+
     if (isInitialLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -140,7 +183,7 @@ function CanvasEditorPageContent() {
         <SidebarProvider defaultOpen={true} style={{
             "--sidebar-width": "20rem",
             "--sidebar-width-mobile": "20rem",
-        } as React.CSSProperties}>
+        } as React.CSSProperties} className="h-screen overflow-hidden">
             <CanvasSidebar
                 canvases={canvases}
                 onCreateCanvas={handleCreateCanvas}
@@ -154,6 +197,12 @@ function CanvasEditorPageContent() {
                 canvasId={canvasId}
                 currentCanvas={currentCanvas}
                 onCanvasUpdate={handleCanvasUpdate}
+            />
+            <AgentChat
+                canvasId={canvasId}
+                onCanvasModified={handleCanvasModified}
+                isOpen={showAgentChat}
+                onToggle={toggleAgentChat}
             />
         </SidebarProvider>
     );

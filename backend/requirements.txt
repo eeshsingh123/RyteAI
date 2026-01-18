@@ -1,6 +1,9 @@
 fastapi
 uvicorn
 motor
+langgraph
+langchain-core
+langchain-google-genai
 pydantic-settings
 python-dotenv
 google-genai

@@ -1,13 +1,15 @@
 from datetime import datetime
 from typing import List
-from bson import ObjectId
 
+from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from auth.supabase_auth import get_current_user, CurrentUser
 from database.connection import get_database
+from utils.router_utils import verify_canvas_ownership, canvas_to_dict
+from utils.logger import logger
 from schemas.canvas_schemas import (
     CanvasCreate,
     CanvasUpdate,
@@ -15,51 +17,11 @@ from schemas.canvas_schemas import (
     CanvasFavoriteUpdate,
     CanvasRename,
 )
-from utils.logger import logger
 
-# Create router instance
+
 router = APIRouter(
     prefix="/canvas", tags=["canvas"], responses={404: {"description": "Not found"}}
 )
-
-
-def canvas_helper(canvas) -> dict:
-    return {
-        "id": str(canvas["_id"]),
-        "name": canvas["name"],
-        "description": canvas.get("description"),
-        "content": canvas.get("content", {}),
-        "is_favorite": canvas.get("is_favorite", False),
-        "tags": canvas.get("tags", []),
-        "user_id": canvas["user_id"],
-        "created_at": canvas["created_at"],
-        "updated_at": canvas["updated_at"],
-    }
-
-
-async def verify_canvas_ownership(
-    db: AsyncIOMotorDatabase, canvas_id: str, user_id: str
-) -> dict:
-    """Verify the canvas exists and belongs to the current user."""
-    if not ObjectId.is_valid(canvas_id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid canvas ID format",
-        )
-
-    canvas = await db.canvas.find_one({"_id": ObjectId(canvas_id)})
-
-    if not canvas:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Canvas not found"
-        )
-
-    if canvas["user_id"] != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this canvas"
-        )
-
-    return canvas
 
 
 @router.post("/", response_model=CanvasResponse, status_code=status.HTTP_201_CREATED)
@@ -90,7 +52,7 @@ async def create_canvas(
         logger.info(
             f"Canvas created successfully: {result.inserted_id} by user {current_user.user_id}"
         )
-        return CanvasResponse(**canvas_helper(created_canvas))
+        return CanvasResponse(**canvas_to_dict(created_canvas))
 
     except HTTPException:
         raise
@@ -124,7 +86,7 @@ async def get_canvases(
         )
         canvases = await cursor.to_list(length=limit)
 
-        return [CanvasResponse(**canvas_helper(canvas)) for canvas in canvases]
+        return [CanvasResponse(**canvas_to_dict(canvas)) for canvas in canvases]
 
     except Exception as e:
         logger.error(f"Error fetching canvases: {e}")
@@ -142,7 +104,7 @@ async def get_canvas(
 ) -> CanvasResponse:
     try:
         canvas = await verify_canvas_ownership(db, canvas_id, current_user.user_id)
-        return CanvasResponse(**canvas_helper(canvas))
+        return CanvasResponse(**canvas_to_dict(canvas))
 
     except HTTPException:
         raise
@@ -184,7 +146,7 @@ async def update_canvas(
         updated_canvas = await db.canvas.find_one({"_id": ObjectId(canvas_id)})
 
         logger.info(f"Canvas updated successfully: {canvas_id}")
-        return CanvasResponse(**canvas_helper(updated_canvas))
+        return CanvasResponse(**canvas_to_dict(updated_canvas))
 
     except HTTPException:
         raise
@@ -227,7 +189,7 @@ async def toggle_canvas_favorite(
         updated_canvas = await db.canvas.find_one({"_id": ObjectId(canvas_id)})
 
         logger.info(f"Canvas favorite status updated: {canvas_id}")
-        return CanvasResponse(**canvas_helper(updated_canvas))
+        return CanvasResponse(**canvas_to_dict(updated_canvas))
 
     except HTTPException:
         raise
@@ -265,7 +227,7 @@ async def rename_canvas(
         updated_canvas = await db.canvas.find_one({"_id": ObjectId(canvas_id)})
 
         logger.info(f"Canvas renamed successfully: {canvas_id}")
-        return CanvasResponse(**canvas_helper(updated_canvas))
+        return CanvasResponse(**canvas_to_dict(updated_canvas))
 
     except HTTPException:
         raise

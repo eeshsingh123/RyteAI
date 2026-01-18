@@ -674,3 +674,98 @@ kbd {
     font-size: 1.15rem;
   }
 }
+
+/* ========================================
+   Agent Chat Sidebar Styling
+   ======================================== */
+
+.agent-chat-sidebar {
+  animation: slideInRight 0.2s ease-out;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Agent chat scrollbar styling */
+.agent-chat-sidebar [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.agent-chat-sidebar [data-radix-scroll-area-viewport]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.agent-chat-sidebar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.agent-chat-sidebar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* Tool call animation */
+.agent-chat-sidebar .tool-call-running {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Message animation */
+.agent-chat-sidebar .message-enter {
+  animation: messageSlideIn 0.2s ease-out;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Resize handle styling */
+.agent-chat-sidebar .resize-handle {
+  touch-action: none;
+}
+
+/* Responsive agent chat */
+@media (max-width: 1024px) {
+  .agent-chat-sidebar {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+    height: 100vh !important;
+    max-height: 100vh !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .agent-chat-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}

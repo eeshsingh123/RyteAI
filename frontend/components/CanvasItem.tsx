@@ -1,3 +1,5 @@
+'use client';
+
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { FileText, Star, MoreHorizontal, Trash2 } from "lucide-react";

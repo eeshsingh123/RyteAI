@@ -5,7 +5,6 @@ This module provides JWT verification for Supabase Auth tokens.
 Supports both HS256 (symmetric) and ES256/RS256 (asymmetric) algorithms.
 """
 
-import logging
 from typing import Optional
 from dataclasses import dataclass
 from functools import lru_cache
@@ -16,8 +15,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from config import settings
-
-logger = logging.getLogger(__name__)
+from utils.logger import logger
 
 # HTTP Bearer token scheme
 security = HTTPBearer()

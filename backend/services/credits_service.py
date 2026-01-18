@@ -5,14 +5,12 @@ This service uses the Supabase service role key to call the
 consume_credit and refund_credit RPC functions atomically.
 """
 
-import logging
 from typing import Optional
 from dataclasses import dataclass
 
 from supabase import create_client, Client
 from config import settings
-
-logger = logging.getLogger(__name__)
+from utils.logger import logger
 
 
 @dataclass

@@ -1,5 +1,4 @@
 from datetime import datetime
-import logging
 from typing import List
 from bson import ObjectId
 
@@ -16,8 +15,7 @@ from schemas.canvas_schemas import (
     CanvasFavoriteUpdate,
     CanvasRename,
 )
-
-logger = logging.getLogger(__name__)
+from utils.logger import logger
 
 # Create router instance
 router = APIRouter(
@@ -89,7 +87,9 @@ async def create_canvas(
                 detail="Failed to create canvas",
             )
 
-        logger.info(f"Canvas created successfully: {result.inserted_id} by user {current_user.user_id}")
+        logger.info(
+            f"Canvas created successfully: {result.inserted_id} by user {current_user.user_id}"
+        )
         return CanvasResponse(**canvas_helper(created_canvas))
 
     except HTTPException:

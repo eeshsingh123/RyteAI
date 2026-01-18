@@ -1,4 +1,3 @@
-import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status
@@ -9,12 +8,7 @@ from config import settings
 from database.connection import db_manager
 from routers.canvas_router import router as canvas_router
 from routers.ai_router import router as ai_router
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+from utils.logger import logger
 
 
 @asynccontextmanager

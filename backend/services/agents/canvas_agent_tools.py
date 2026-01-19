@@ -20,13 +20,6 @@ from utils.logger import logger
 # Tool Input/Output Schemas
 # ============================================================================
 
-
-class GetCanvasTextInput(BaseModel):
-    """Input schema for get_canvas_text tool."""
-
-    # No input fields needed for this tool
-
-
 class SearchCanvasInput(BaseModel):
     """Input schema for search_canvas tool."""
 
@@ -351,9 +344,7 @@ class CanvasTools:
                 success=False, message=f"Failed to replace text: {str(e)}"
             )
 
-    async def _replace_text_chunked(
-        self, content: dict[str, Any], input_data: ReplaceTextInput
-    ) -> ToolResult:
+    async def _replace_text_chunked(self, content: dict[str, Any], input_data: ReplaceTextInput) -> ToolResult:
         """
         Replace text in large canvases using chunked processing.
 

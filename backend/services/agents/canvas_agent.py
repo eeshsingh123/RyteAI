@@ -1,17 +1,5 @@
-"""
-Canvas Agent - LangGraph Implementation
-
-A LangGraph-based agent that manipulates canvas content using tools.
-Uses Google Gemini as the LLM and Pydantic for state management.
-
-The agent follows a ReAct pattern:
-1. Receive user message
-2. Decide whether to use a tool or respond
-3. If tool needed: execute tool, observe result, loop back
-4. If no tool needed: respond to user
-"""
-
-from typing import Literal, Any
+from typing import Literal, Any, Annotated
+import operator
 
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, END
@@ -51,9 +39,13 @@ class AgentState(BaseModel):
 
     Uses Pydantic for validation and serialization.
     Messages are accumulated as the agent processes requests.
+
+    Note: The messages field uses Annotated with operator.add to ensure
+    messages are accumulated (appended) rather than replaced when nodes
+    return updates.
     """
 
-    messages: list[BaseMessage] = Field(default_factory=list)
+    messages: Annotated[list[BaseMessage], operator.add] = Field(default_factory=list)
     canvas_id: str = Field(default="")
     user_id: str = Field(default="")
     tool_calls_made: int = Field(default=0)
@@ -353,26 +345,15 @@ class CanvasAgent:
         if not any(isinstance(m, SystemMessage) for m in messages):
             messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
 
-        # Fix AIMessage content=None issue for Gemini
-        # Gemini requires all messages to have non-null content
-        for i, msg in enumerate(messages):
-            if isinstance(msg, AIMessage) and msg.content is None:
-                # Create a new AIMessage with empty string content but preserve tool_calls
-                messages[i] = AIMessage(
-                    content="",
-                    tool_calls=msg.tool_calls if hasattr(msg, "tool_calls") else [],
-                    id=msg.id if hasattr(msg, "id") else None,
-                )
-
         # Call LLM
-        try:
-            response = await self.llm.ainvoke(messages)
-            logger.debug(f"Agent response: {response}")
-            return {"messages": [response]}
-        except Exception as e:
-            logger.error(f"Agent node error: {e}")
-            error_response = AIMessage(content=f"I encountered an error: {str(e)}")
-            return {"messages": [error_response]}
+        # try:
+        response = await self.llm.ainvoke(messages)
+        logger.debug(f"Agent response: {response}")
+        return {"messages": [response]}
+        # except Exception as e:
+        #     logger.error(f"Agent node error: {e}")
+        #     error_response = AIMessage(content=f"I encountered an error: {str(e)}")
+        #     return {"messages": [error_response]}
 
     async def _tool_node(self, state: AgentState) -> dict[str, Any]:
         """
@@ -496,7 +477,7 @@ class CanvasAgent:
             logger.error(f"Agent run error: {e}")
             raise
 
-    async def stream(self, user_message: str, thread_id: str | None = None):
+    async def run_stream(self, user_message: str, thread_id: str | None = None):
         """
         Stream agent execution events.
 
@@ -520,38 +501,35 @@ class CanvasAgent:
             "configurable": {"thread_id": thread_id or f"canvas_{self.canvas_id}"}
         }
 
-        try:
-            async for event in self.graph.astream(
-                initial_state, config, stream_mode="values"
-            ):
-                messages = event.get("messages", [])
-                if messages:
-                    last_message = messages[-1]
+        # try:
+        async for event in self.graph.astream(
+            initial_state, config, stream_mode="values"
+        ):
+            messages = event.get("messages", [])
+            if messages:
+                last_message = messages[-1]
 
-                    if isinstance(last_message, AIMessage):
-                        if (
-                            hasattr(last_message, "tool_calls")
-                            and last_message.tool_calls
-                        ):
-                            for tool_call in last_message.tool_calls:
-                                yield {
-                                    "event": "tool_call",
-                                    "tool_name": tool_call["name"],
-                                    "tool_args": tool_call["args"],
-                                }
-                        elif last_message.content:
+                if isinstance(last_message, AIMessage):
+                    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+                        for tool_call in last_message.tool_calls:
                             yield {
-                                "event": "response",
-                                "content": last_message.content,
+                                "event": "tool_call",
+                                "tool_name": tool_call["name"],
+                                "tool_args": tool_call["args"],
                             }
-
-                    elif isinstance(last_message, ToolMessage):
+                    elif last_message.content:
                         yield {
-                            "event": "tool_result",
-                            "tool_name": last_message.name,
-                            "result": last_message.content,
+                            "event": "response",
+                            "content": last_message.content,
                         }
 
-        except Exception as e:
-            logger.error(f"Stream error: {e}")
-            yield {"event": "error", "error": str(e)}
+                elif isinstance(last_message, ToolMessage):
+                    yield {
+                        "event": "tool_result",
+                        "tool_name": last_message.name,
+                        "result": last_message.content,
+                    }
+
+        # except Exception as e:
+        #     logger.error(f"Stream error: {e}")
+        #     yield {"event": "error", "error": str(e)}

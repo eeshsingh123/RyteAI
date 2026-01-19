@@ -163,6 +163,24 @@ export function AgentChat({ canvasId, onCanvasModified, isOpen, onToggle }: Agen
         }
     };
 
+    // Extract text content from message (handles both string and object formats)
+    const extractMessageContent = (message: unknown): string => {
+        if (typeof message === 'string') {
+            return message;
+        }
+        if (message && typeof message === 'object') {
+            // Handle LLM response format: {type, text, extras}
+            if ('text' in message && typeof (message as { text: unknown }).text === 'string') {
+                return (message as { text: string }).text;
+            }
+            // Handle content array format from some LLMs
+            if ('content' in message && typeof (message as { content: unknown }).content === 'string') {
+                return (message as { content: string }).content;
+            }
+        }
+        return '';
+    };
+
     const handleSend = useCallback(async () => {
         if (!input.trim() || isProcessing) return;
 
@@ -303,8 +321,8 @@ export function AgentChat({ canvasId, onCanvasModified, isOpen, onToggle }: Agen
                         }
 
                         case 'response':
-                            // Update with final response
-                            finalResponse = event.message || '';
+                            // Update with final response (handle object format from LLM)
+                            finalResponse = extractMessageContent(event.message);
                             setMessages(prev => prev.map(msg =>
                                 msg.id === assistantMessageId
                                     ? { ...msg, content: finalResponse }
@@ -313,12 +331,12 @@ export function AgentChat({ canvasId, onCanvasModified, isOpen, onToggle }: Agen
                             break;
 
                         case 'completed':
-                            // Finalize the message
+                            // Finalize the message (handle object format from LLM)
                             setMessages(prev => prev.map(msg =>
                                 msg.id === assistantMessageId
                                     ? {
                                         ...msg,
-                                        content: finalResponse || event.message || 'Task completed!',
+                                        content: finalResponse || extractMessageContent(event.message) || 'Task completed!',
                                         isStreaming: false,
                                         toolCalls: toolCalls.length > 0 ? toolCalls : undefined
                                     }

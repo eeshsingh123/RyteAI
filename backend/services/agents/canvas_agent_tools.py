@@ -1,14 +1,3 @@
-"""
-Canvas Agent Tools
-
-Provides tools for the LangGraph agent to manipulate ProseMirror canvas content.
-Each tool is designed to be self-contained with clear docstrings so the LLM
-can understand when and how to use them.
-
-Tools are designed to handle large canvases (1000+ nodes) efficiently through
-chunked processing where applicable.
-"""
-
 from typing import Any
 from datetime import datetime, timezone
 

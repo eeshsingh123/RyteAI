@@ -106,66 +106,66 @@ async def execute_agent_task_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         """Generate SSE events from agent execution."""
-        try:
-            # Send started event
-            yield format_sse_event("started", {"message": "Agent started processing"})
+        # try:
+        # Send started event
+        yield format_sse_event("started", {"message": "Agent started processing"})
 
-            # Create agent
-            agent = CanvasAgent(db, request.canvas_id, current_user.user_id)
+        # Create agent
+        agent = CanvasAgent(db, request.canvas_id, current_user.user_id)
 
-            # Stream agent execution
-            final_response = None
-            async for event in agent.stream(request.query, request.thread_id):
-                event_type = event.get("event", "unknown")
+        # Stream agent execution
+        final_response = None
+        async for event in agent.run_stream(request.query, request.thread_id):
+            event_type = event.get("event", "unknown")
 
-                if event_type == "tool_call":
-                    yield format_sse_event(
-                        "tool_call",
-                        {
-                            "tool_name": event.get("tool_name"),
-                            "tool_args": event.get("tool_args", {}),
-                        },
-                    )
+            if event_type == "tool_call":
+                yield format_sse_event(
+                    "tool_call",
+                    {
+                        "tool_name": event.get("tool_name"),
+                        "tool_args": event.get("tool_args", {}),
+                    },
+                )
 
-                elif event_type == "tool_result":
-                    yield format_sse_event(
-                        "tool_result",
-                        {
-                            "tool_name": event.get("tool_name"),
-                            "result": event.get("result"),
-                        },
-                    )
+            elif event_type == "tool_result":
+                yield format_sse_event(
+                    "tool_result",
+                    {
+                        "tool_name": event.get("tool_name"),
+                        "result": event.get("result"),
+                    },
+                )
 
-                elif event_type == "response":
-                    final_response = event.get("content", "")
-                    yield format_sse_event(
-                        "response",
-                        {"message": final_response},
-                    )
+            elif event_type == "response":
+                final_response = event.get("content", "")
+                yield format_sse_event(
+                    "response",
+                    {"message": final_response},
+                )
 
-                elif event_type == "error":
-                    yield format_sse_event(
-                        "error",
-                        {"error": event.get("error", "Unknown error")},
-                    )
-                    return
+            elif event_type == "error":
+                yield format_sse_event(
+                    "error",
+                    {"error": event.get("error", "Unknown error")},
+                )
+                return
 
-            # Send completed event
-            yield format_sse_event(
-                "completed",
-                {
-                    "message": final_response or "Task completed",
-                    "canvas_id": request.canvas_id,
-                },
-            )
+        # Send completed event
+        yield format_sse_event(
+            "completed",
+            {
+                "message": final_response or "Task completed",
+                "canvas_id": request.canvas_id,
+            },
+        )
 
-            logger.info(
-                f"Agent stream completed for canvas {request.canvas_id} by user {current_user.user_id}"
-            )
+        logger.info(
+            f"Agent stream completed for canvas {request.canvas_id} by user {current_user.user_id}"
+        )
 
-        except Exception as e:
-            logger.error(f"Agent stream error: {e}")
-            yield format_sse_event("error", {"error": str(e)})
+        # except Exception as e:
+        #     logger.error(f"Agent stream error: {e}")
+        #     yield format_sse_event("error", {"error": str(e)})
 
     return StreamingResponse(
         event_generator(),

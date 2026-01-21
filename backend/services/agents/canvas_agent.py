@@ -346,14 +346,14 @@ class CanvasAgent:
             messages = [SystemMessage(content=SYSTEM_PROMPT)] + messages
 
         # Call LLM
-        # try:
-        response = await self.llm.ainvoke(messages)
-        logger.debug(f"Agent response: {response}")
-        return {"messages": [response]}
-        # except Exception as e:
-        #     logger.error(f"Agent node error: {e}")
-        #     error_response = AIMessage(content=f"I encountered an error: {str(e)}")
-        #     return {"messages": [error_response]}
+        try:
+            response = await self.llm.ainvoke(messages)
+            logger.info(f"Agent response: {response}")
+            return {"messages": [response]}
+        except Exception as e:
+            logger.error(f"Agent node error: {e}")
+            error_response = AIMessage(content=f"I encountered an error: {str(e)}")
+            return {"messages": [error_response]}
 
     async def _tool_node(self, state: AgentState) -> dict[str, Any]:
         """
@@ -501,35 +501,33 @@ class CanvasAgent:
             "configurable": {"thread_id": thread_id or f"canvas_{self.canvas_id}"}
         }
 
-        # try:
-        async for event in self.graph.astream(
-            initial_state, config, stream_mode="values"
-        ):
-            messages = event.get("messages", [])
-            if messages:
-                last_message = messages[-1]
+        try:
+            async for event in self.graph.astream(initial_state, config, stream_mode="values"):
+                messages = event.get("messages", [])
+                if messages:
+                    last_message = messages[-1]
 
-                if isinstance(last_message, AIMessage):
-                    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-                        for tool_call in last_message.tool_calls:
+                    if isinstance(last_message, AIMessage):
+                        if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+                            for tool_call in last_message.tool_calls:
+                                yield {
+                                    "event": "tool_call",
+                                    "tool_name": tool_call["name"],
+                                    "tool_args": tool_call["args"],
+                                }
+                        elif last_message.content:
                             yield {
-                                "event": "tool_call",
-                                "tool_name": tool_call["name"],
-                                "tool_args": tool_call["args"],
+                                "event": "response",
+                                "content": last_message.content,
                             }
-                    elif last_message.content:
+
+                    elif isinstance(last_message, ToolMessage):
                         yield {
-                            "event": "response",
-                            "content": last_message.content,
+                            "event": "tool_result",
+                            "tool_name": last_message.name,
+                            "result": last_message.content,
                         }
 
-                elif isinstance(last_message, ToolMessage):
-                    yield {
-                        "event": "tool_result",
-                        "tool_name": last_message.name,
-                        "result": last_message.content,
-                    }
-
-        # except Exception as e:
-        #     logger.error(f"Stream error: {e}")
-        #     yield {"event": "error", "error": str(e)}
+        except Exception as e:
+            logger.error(f"Stream error: {e}")
+            yield {"event": "error", "error": str(e)}

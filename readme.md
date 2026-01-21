@@ -8,7 +8,7 @@
   - Improve Text (All text based LLM operations - summary etc.)
   - @agent -> syntax integration to call the LLM for instructions that comes after @agent
 - User based authentication & authorization + credit system (to avoid LLM abuse) [Implemented Jan 14th 2026]
-- - Agent chat interface (like cursor) to improve/edit content [Implemented Jan 19th 2026]
+- Agent chat interface (like cursor) to improve/edit content [Implemented Jan 19th 2026]
 
 ## Things to be implemented in the order of priority
 

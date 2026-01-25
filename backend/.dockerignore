@@ -1,0 +1,44 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+.venv
+venv
+ENV
+
+# Environment files (secrets should be passed via env vars)
+.env
+.env.local
+.env.production
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Documentation
+*.md
+docs/
+
+# Docker (avoid recursive copy)
+docker-compose*.yml
+Dockerfile
+
+# Tests
+tests/
+pytest_cache/
+.coverage
+
+# Misc
+*.log
+.DS_Store
